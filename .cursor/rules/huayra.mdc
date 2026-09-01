@@ -1,0 +1,7 @@
+---
+description: Huayra fork conventions for Cursor agents
+globs:
+  - "**/*"
+---
+
+Preserve credit to zanneth. Do not strip the MIT LICENSE. Prefer small, dense UI changes over framework rewrites. OpenCode and Grok stay separate providers.

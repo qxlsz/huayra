@@ -1,0 +1,10 @@
+services:
+  huayra:
+    build:
+      context: ..
+      dockerfile: packaging/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      XAI_API_KEY: ${XAI_API_KEY:-}
+    restart: unless-stopped
