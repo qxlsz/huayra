@@ -4,4 +4,7 @@ globs:
   - "**/*"
 ---
 
-Preserve credit to zanneth. Do not strip the MIT LICENSE. Prefer small, dense UI changes over framework rewrites. OpenCode and Grok stay separate providers.
+Preserve credit to zanneth. Do not strip the MIT LICENSE.
+Providers: demo, grok, opencode, cursor, custom.
+Custom engines are OpenAI-compatible base URLs. Do not log API keys.
+Host gate passphrase hashes live server-side. Never print the phrase.
