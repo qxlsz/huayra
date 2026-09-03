@@ -1,1 +1,330 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><title>Huayra playground</title></head><body><p>Huayra static playground. See README.</p></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Huayra playground</title>
+  <style>
+    :root {
+      --bg: #0b0b0f;
+      --panel: #12121a;
+      --border: #2a2a36;
+      --text: #e8e8ef;
+      --muted: #8b8b9a;
+      --accent: #7aa2f7;
+      --ok: #9ece6a;
+      --warn: #e0af68;
+      --err: #f7768e;
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    #app {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100%;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    header .brand { font-weight: 600; letter-spacing: 0.04em; }
+    header .credit { color: var(--muted); margin-left: auto; font-size: 11px; }
+    header a { color: var(--accent); text-decoration: none; }
+    header a:hover { text-decoration: underline; }
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      background: #0e0e14;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .dot.ok { background: var(--ok); }
+    .dot.warn { background: var(--warn); }
+    .dot.err { background: var(--err); }
+    #log {
+      padding: 12px 14px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    #log .line { margin: 0 0 6px; }
+    #log .sys { color: var(--muted); }
+    #log .user { color: var(--accent); }
+    #log .assistant { color: var(--text); }
+    #log .err { color: var(--err); }
+    footer {
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      padding: 10px 14px;
+    }
+    #prompt-form {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    #prompt {
+      flex: 1;
+      min-height: 44px;
+      max-height: 160px;
+      resize: vertical;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 10px;
+      font: inherit;
+    }
+    #prompt:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    button {
+      font: inherit;
+      background: #1a1a28;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #gate {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+    #gate.open { display: flex; }
+    #gate .card {
+      width: min(360px, 92vw);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+    }
+    #gate label { display: block; margin-bottom: 6px; color: var(--muted); }
+    #gate input {
+      width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 10px;
+      font: inherit;
+      margin-bottom: 10px;
+    }
+    #gate .actions { display: flex; gap: 8px; justify-content: flex-end; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <span class="brand">HUAYRA</span>
+      <span class="credit">Charles <a href="https://x.com/zanneth" target="_blank" rel="noopener">@zanneth</a> · MIT · fork qxlsz</span>
+    </header>
+    <div class="status-row" aria-live="polite">
+      <span class="pill"><span id="opencode-dot" class="dot"></span><span id="opencode-label">OpenCode …</span></span>
+      <span class="pill"><span id="provider-dot" class="dot ok"></span><span id="provider-label">provider demo</span></span>
+      <span class="pill"><span id="gate-dot" class="dot"></span><span id="gate-label">gate off</span></span>
+    </div>
+    <div id="log" role="log"></div>
+    <footer>
+      <form id="prompt-form">
+        <textarea id="prompt" rows="2" placeholder="prompt" autocomplete="off" spellcheck="false"></textarea>
+        <button type="submit" id="send">send</button>
+      </form>
+    </footer>
+  </div>
+
+  <div id="gate" aria-hidden="true">
+    <div class="card">
+      <label for="phrase">host gate (optional)</label>
+      <input id="phrase" type="password" autocomplete="current-password" placeholder="passphrase"/>
+      <div class="actions">
+        <button type="button" id="gate-skip">skip</button>
+        <button type="button" id="gate-unlock">unlock</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    const OPENCODE_DEFAULT = "http://127.0.0.1:4096";
+    const logEl = document.getElementById("log");
+    const form = document.getElementById("prompt-form");
+    const promptEl = document.getElementById("prompt");
+    const sendBtn = document.getElementById("send");
+    const opencodeDot = document.getElementById("opencode-dot");
+    const opencodeLabel = document.getElementById("opencode-label");
+    const providerLabel = document.getElementById("provider-label");
+    const gateDot = document.getElementById("gate-dot");
+    const gateLabel = document.getElementById("gate-label");
+    const gateOverlay = document.getElementById("gate");
+    const phraseInput = document.getElementById("phrase");
+
+    let provider = "demo";
+    let opencodeUrl = OPENCODE_DEFAULT;
+    let opencodeReachable = false;
+    let unlocked = true;
+
+    function line(cls, text) {
+      const p = document.createElement("div");
+      p.className = `line ${cls}`;
+      p.textContent = text;
+      logEl.appendChild(p);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setOpenCodeStatus(state, detail) {
+      opencodeDot.className = "dot " + (state === "ok" ? "ok" : state === "warn" ? "warn" : state === "err" ? "err" : "");
+      opencodeLabel.textContent = detail;
+    }
+
+    async function probeOpenCode() {
+      setOpenCodeStatus("", "OpenCode probing…");
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 1200);
+      try {
+        const res = await fetch(opencodeUrl + "/health", {
+          method: "GET",
+          mode: "cors",
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (res.ok || res.status === 404) {
+          opencodeReachable = true;
+          provider = "opencode";
+          providerLabel.textContent = "provider opencode";
+          setOpenCodeStatus("ok", `OpenCode ${opencodeUrl}`);
+          line("sys", `attached OpenCode at ${opencodeUrl}`);
+          return;
+        }
+        throw new Error(`status ${res.status}`);
+      } catch (err) {
+        clearTimeout(timer);
+        opencodeReachable = false;
+        provider = "demo";
+        providerLabel.textContent = "provider demo";
+        setOpenCodeStatus("warn", `OpenCode unreachable (${opencodeUrl})`);
+      }
+    }
+
+    async function sendPrompt(text) {
+      line("user", `> ${text}`);
+      if (provider === "opencode" && opencodeReachable) {
+        sendBtn.disabled = true;
+        try {
+          const res = await fetch(opencodeUrl + "/v1/chat/completions", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              model: "opencode",
+              messages: [{ role: "user", content: text }],
+              stream: false,
+            }),
+          });
+          if (!res.ok) {
+            const body = await res.text().catch(() => "");
+            throw new Error(`OpenCode ${res.status} ${body.slice(0, 200)}`);
+          }
+          const data = await res.json();
+          const content =
+            data?.choices?.[0]?.message?.content ??
+            data?.message?.content ??
+            JSON.stringify(data).slice(0, 500);
+          line("assistant", String(content));
+        } catch (err) {
+          line("err", `OpenCode request failed: ${err.message || err}`);
+          line("sys", "falling back to local echo");
+          line("assistant", text);
+        } finally {
+          sendBtn.disabled = false;
+        }
+        return;
+      }
+      line("sys", "demo: no remote engine; echo only");
+      line("assistant", text);
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (!unlocked) {
+        gateOverlay.classList.add("open");
+        gateOverlay.setAttribute("aria-hidden", "false");
+        return;
+      }
+      const text = promptEl.value.trim();
+      if (!text) return;
+      promptEl.value = "";
+      sendPrompt(text);
+    });
+
+    promptEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    document.getElementById("gate-skip").addEventListener("click", () => {
+      unlocked = true;
+      gateOverlay.classList.remove("open");
+      gateOverlay.setAttribute("aria-hidden", "true");
+      gateDot.className = "dot";
+      gateLabel.textContent = "gate off";
+    });
+
+    document.getElementById("gate-unlock").addEventListener("click", () => {
+      const phrase = phraseInput.value;
+      if (!phrase) {
+        line("err", "empty passphrase");
+        return;
+      }
+      unlocked = true;
+      phraseInput.value = "";
+      gateOverlay.classList.remove("open");
+      gateOverlay.setAttribute("aria-hidden", "true");
+      gateDot.className = "dot ok";
+      gateLabel.textContent = "gate local";
+      line("sys", "host gate accepted (client-side only in playground)");
+    });
+
+    // First paint is never blocked by gate or OpenCode probe.
+    line("sys", "Huayra playground ready");
+    line("sys", "Credit: Charles @zanneth · MIT");
+    probeOpenCode();
+  </script>
+</body>
+</html>
