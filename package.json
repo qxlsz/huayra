@@ -1,0 +1,26 @@
+{
+  "name": "huayra",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hostable Huayra ADE fork — engine contract, desktop wrapper, and VPS packaging.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    "./engines": "./src/engines.js",
+    "./host-url": "./src/host-url.js",
+    "./host-gate": "./src/host-gate.js",
+    "./redact": "./src/redact.js"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "npm run build && node scripts/preview.mjs --host 127.0.0.1 --port 8080",
+    "lint": "node scripts/lint.mjs",
+    "preview": "node scripts/preview.mjs",
+    "smoke:docker": "node scripts/smoke-docker.mjs",
+    "smoke:preview": "node scripts/smoke-preview.mjs",
+    "test": "node --test test/*.test.js"
+  }
+}
