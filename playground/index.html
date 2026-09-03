@@ -157,7 +157,7 @@
     </header>
     <div class="status-row" aria-live="polite">
       <span class="pill"><span id="opencode-dot" class="dot"></span><span id="opencode-label">OpenCode …</span></span>
-      <span class="pill"><span id="provider-dot" class="dot ok"></span><span id="provider-label">provider demo</span></span>
+      <span class="pill"><span id="provider-dot" class="dot"></span><span id="provider-label">provider none</span></span>
       <span class="pill"><span id="model-dot" class="dot"></span><span id="model-label">model —</span></span>
       <span class="pill"><span id="thinking-dot" class="dot"></span><span id="thinking-label">thinking idle</span></span>
       <span class="pill"><span id="gate-dot" class="dot"></span><span id="gate-label">gate off</span></span>
@@ -201,11 +201,12 @@
     const gateOverlay = document.getElementById("gate");
     const phraseInput = document.getElementById("phrase");
 
-    let provider = "demo";
+    let provider = "none";
     let opencodeUrl = OPENCODE_DEFAULT;
     let opencodeReachable = false;
     let activeModel = null;
     let unlocked = true;
+    let probeTimer = null;
 
     function line(cls, text) {
       const p = document.createElement("div");
@@ -272,9 +273,25 @@
       }
     }
 
-    async function probeOpenCode() {
-      setOpenCodeStatus("", "OpenCode probing…");
-      setModelStatus(null);
+    function stopProbeTimer() {
+      if (probeTimer != null) {
+        clearInterval(probeTimer);
+        probeTimer = null;
+      }
+    }
+
+    function startProbeTimer() {
+      if (probeTimer != null) return;
+      // Re-probe while unreachable so attach happens without a full reload.
+      probeTimer = setInterval(() => {
+        if (!opencodeReachable) probeOpenCode({ quiet: true });
+      }, 12000);
+    }
+
+    async function probeOpenCode(opts = {}) {
+      const quiet = !!opts.quiet;
+      if (!quiet) setOpenCodeStatus("", "OpenCode probing…");
+      if (!quiet) setModelStatus(null);
       const paths = ["/health", "/v1/models", "/"];
       for (const path of paths) {
         try {
@@ -292,7 +309,12 @@
             setOpenCodeStatus("ok", `OpenCode ${opencodeUrl}`);
             const model = await resolveOpenCodeModel();
             setModelStatus(model || "opencode");
-            line("sys", `attached OpenCode at ${opencodeUrl}` + (model ? ` · ${model}` : ""));
+            stopProbeTimer();
+            if (!quiet) {
+              line("sys", `attached OpenCode at ${opencodeUrl}` + (model ? ` · ${model}` : ""));
+            } else {
+              line("sys", `OpenCode became reachable · ${opencodeUrl}` + (model ? ` · ${model}` : ""));
+            }
             return;
           }
         } catch {
@@ -300,11 +322,12 @@
         }
       }
       opencodeReachable = false;
-      provider = "demo";
-      providerDot.className = "dot ok";
-      providerLabel.textContent = "provider demo";
+      provider = "none";
+      providerDot.className = "dot";
+      providerLabel.textContent = "provider none";
       setOpenCodeStatus("warn", `OpenCode unreachable (${opencodeUrl})`);
-      setModelStatus(null);
+      if (!quiet) setModelStatus(null);
+      startProbeTimer();
     }
 
     async function sendPrompt(text) {
