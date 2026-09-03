@@ -19,3 +19,24 @@ test("uses HUAYRA_URL when set", () => {
     "https://huayra.example/",
   );
 });
+
+test("ignores non-string and missing env values", () => {
+  assert.equal(resolveHuayraUrl({ HUAYRA_URL: undefined }), DEFAULT_HUAYRA_URL);
+  assert.equal(resolveHuayraUrl({ HUAYRA_URL: null }), DEFAULT_HUAYRA_URL);
+  assert.equal(resolveHuayraUrl({ HUAYRA_URL: 8080 }), DEFAULT_HUAYRA_URL);
+  assert.equal(resolveHuayraUrl({ HUAYRA_URL: "\n\t" }), DEFAULT_HUAYRA_URL);
+});
+
+test("reads process.env when no map is passed", () => {
+  const previous = process.env.HUAYRA_URL;
+  process.env.HUAYRA_URL = "http://127.0.0.1:9999";
+  try {
+    assert.equal(resolveHuayraUrl(), "http://127.0.0.1:9999");
+  } finally {
+    if (previous === undefined) {
+      delete process.env.HUAYRA_URL;
+    } else {
+      process.env.HUAYRA_URL = previous;
+    }
+  }
+});

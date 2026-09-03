@@ -7,6 +7,7 @@ import {
   OPENCODE_DEFAULT_URL,
   PROVIDERS,
   chatCompletionsUrl,
+  isKnownProvider,
   isLocalEngineUrl,
   resolveEngine,
   resolvePreset,
@@ -93,5 +94,62 @@ test("chat completions URLs stay OpenAI-compatible", () => {
     "https://api.x.ai/v1/chat/completions",
   );
   assert.equal(chatCompletionsUrl("http://127.0.0.1:8000"), "http://127.0.0.1:8000/v1/chat/completions");
+  assert.equal(chatCompletionsUrl("  https://api.x.ai/v1///  "), "https://api.x.ai/v1/chat/completions");
   assert.throws(() => chatCompletionsUrl(""), /baseUrl required/);
+  assert.throws(() => chatCompletionsUrl("   "), /baseUrl required/);
+});
+
+test("isKnownProvider and named presets stay complete", () => {
+  assert.equal(isKnownProvider("demo"), true);
+  assert.equal(isKnownProvider("custom"), true);
+  assert.equal(isKnownProvider("openai"), false);
+  assert.equal(resolvePreset("openai").baseUrl, "https://api.openai.com/v1");
+  assert.equal(resolvePreset("openrouter").baseUrl, "https://openrouter.ai/api/v1");
+  assert.equal(resolvePreset("vllm").baseUrl, null);
+  const copy = resolvePreset("ollama");
+  copy.baseUrl = "mutated";
+  assert.equal(ENGINE_PRESETS.ollama.baseUrl, "http://127.0.0.1:11434/v1");
+});
+
+test("overrides do not leak keys or flip remote hosts to local", () => {
+  const grok = resolveEngine({
+    provider: "grok",
+    model: "grok-custom",
+    baseUrl: "https://api.x.ai/v1/",
+    apiKey: "should-not-copy",
+  });
+  assert.equal(grok.model, "grok-custom");
+  assert.equal(grok.local, false);
+  assert.equal("apiKey" in grok, false);
+
+  const remoteOpen = resolveEngine({
+    provider: "opencode",
+    baseUrl: "https://opencode.example/v1",
+    model: "remote-open",
+  });
+  assert.equal(remoteOpen.local, false);
+  assert.equal(remoteOpen.model, "remote-open");
+
+  const remoteCursor = resolveEngine({
+    provider: "cursor",
+    baseUrl: "https://proxy.example/v1",
+  });
+  assert.equal(remoteCursor.local, false);
+
+  const demo = resolveEngine({ provider: "demo", model: "offline-harness" });
+  assert.equal(demo.model, "offline-harness");
+  assert.equal(demo.local, true);
+});
+
+test("custom remote engines and whitespace fields", () => {
+  assert.throws(() => resolveEngine({ provider: "custom", baseUrl: "  ", model: "m" }), /baseUrl and model/);
+  assert.throws(() => resolveEngine({ provider: "custom", baseUrl: "https://api.example/v1", model: "  " }), /baseUrl and model/);
+  const remote = resolveEngine({
+    provider: "custom",
+    baseUrl: "https://api.example/v1/",
+    model: "acct/model",
+  });
+  assert.equal(remote.baseUrl, "https://api.example/v1");
+  assert.equal(remote.local, false);
+  assert.equal(isLocalEngineUrl("http://[::1]:11434/v1"), true);
 });

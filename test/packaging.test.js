@@ -6,11 +6,13 @@ function read(rel) {
   return readFileSync(new URL(rel, import.meta.url), "utf8");
 }
 
-test("Electron host uses the shared URL helper", () => {
+test("Electron host uses the shared URL helper and shell options", () => {
   const main = read("../packaging/electron/main.mjs");
   assert.match(main, /from "\.\.\/\.\.\/src\/host-url\.js"/);
+  assert.match(main, /from "\.\/shell\.js"/);
   assert.match(main, /resolveHuayraUrl/);
-  assert.match(main, /backgroundColor: "#11111b"/);
+  assert.match(main, /WINDOW_OPTIONS/);
+  assert.match(main, /shouldQuitOnLastWindow/);
 });
 
 test("Docker and compose keep the console on 8080 without printing secrets", () => {
@@ -36,4 +38,13 @@ test("LICENSE keeps upstream MIT credit", () => {
   const license = read("../LICENSE");
   assert.match(license, /MIT License/);
   assert.match(license, /Copyright \(c\) 2026 zanneth/);
+});
+
+test("CI runs preview and image smokes", () => {
+  const ci = read("../.github/workflows/ci.yml");
+  const dockerignore = read("../.dockerignore");
+  assert.match(ci, /npm run smoke:preview/);
+  assert.match(ci, /smoke-docker\.mjs --require/);
+  assert.match(dockerignore, /^node_modules$/m);
+  assert.match(dockerignore, /^\.git$/m);
 });

@@ -60,4 +60,7 @@ test("preview serves the playground and blocks path traversal", async (t) => {
 
   const traversal = await fetch(`http://127.0.0.1:${port}/../package.json`);
   assert.equal(traversal.status, 404);
+
+  const encoded = await fetch(`http://127.0.0.1:${port}/%2e%2e/package.json`);
+  assert.equal(encoded.status, 404);
 });
