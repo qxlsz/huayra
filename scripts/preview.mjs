@@ -1,7 +1,6 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
-import { extname, join, normalize, relative, resolve } from "node:path";
-import { dirname } from "node:path";
+import { dirname, extname, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");

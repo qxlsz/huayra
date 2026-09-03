@@ -18,7 +18,7 @@ test("Docker and compose keep the console on 8080 without printing secrets", () 
   const compose = read("../packaging/docker-compose.yml");
   assert.match(dockerfile, /EXPOSE 8080/);
   assert.match(dockerfile, /npm run build/);
-  assert.match(dockerfile, /npm run preview/);
+  assert.match(dockerfile, /CMD \["npm", "run", "preview"/);
   assert.match(compose, /"8080:8080"/);
   assert.match(compose, /XAI_API_KEY: \$\{XAI_API_KEY:-\}/);
   assert.doesNotMatch(compose, /echo .*XAI_API_KEY/);
