@@ -1,0 +1,13 @@
+{
+  "name": "huayra-electron",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^37.3.1"
+  }
+}

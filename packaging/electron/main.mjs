@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from "electron";
+import { resolveHuayraUrl } from "../../src/host-url.js";
 
-const url = process.env.HUAYRA_URL || "http://127.0.0.1:8080";
+const url = resolveHuayraUrl(process.env);
 
 function createWindow() {
   const win = new BrowserWindow({

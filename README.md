@@ -10,6 +10,9 @@ Fork: Raj Josyula ([qxlsz](https://github.com/qxlsz)).
 
 ```sh
 npm install
+npm test
+npm run lint
+npm run build
 npm run dev
 ```
 
