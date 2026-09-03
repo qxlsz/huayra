@@ -29,7 +29,7 @@
     }
     #app {
       display: grid;
-      grid-template-rows: auto 1fr auto;
+      grid-template-rows: auto auto 1fr auto;
       height: 100%;
       max-width: 960px;
       margin: 0 auto;
@@ -158,6 +158,8 @@
     <div class="status-row" aria-live="polite">
       <span class="pill"><span id="opencode-dot" class="dot"></span><span id="opencode-label">OpenCode …</span></span>
       <span class="pill"><span id="provider-dot" class="dot ok"></span><span id="provider-label">provider demo</span></span>
+      <span class="pill"><span id="model-dot" class="dot"></span><span id="model-label">model —</span></span>
+      <span class="pill"><span id="thinking-dot" class="dot"></span><span id="thinking-label">thinking idle</span></span>
       <span class="pill"><span id="gate-dot" class="dot"></span><span id="gate-label">gate off</span></span>
     </div>
     <div id="log" role="log"></div>
@@ -188,7 +190,12 @@
     const sendBtn = document.getElementById("send");
     const opencodeDot = document.getElementById("opencode-dot");
     const opencodeLabel = document.getElementById("opencode-label");
+    const providerDot = document.getElementById("provider-dot");
     const providerLabel = document.getElementById("provider-label");
+    const modelDot = document.getElementById("model-dot");
+    const modelLabel = document.getElementById("model-label");
+    const thinkingDot = document.getElementById("thinking-dot");
+    const thinkingLabel = document.getElementById("thinking-label");
     const gateDot = document.getElementById("gate-dot");
     const gateLabel = document.getElementById("gate-label");
     const gateOverlay = document.getElementById("gate");
@@ -197,6 +204,7 @@
     let provider = "demo";
     let opencodeUrl = OPENCODE_DEFAULT;
     let opencodeReachable = false;
+    let activeModel = null;
     let unlocked = true;
 
     function line(cls, text) {
@@ -212,45 +220,104 @@
       opencodeLabel.textContent = detail;
     }
 
-    async function probeOpenCode() {
-      setOpenCodeStatus("", "OpenCode probing…");
+    function setModelStatus(name) {
+      activeModel = name || null;
+      if (activeModel) {
+        modelDot.className = "dot ok";
+        modelLabel.textContent = `model ${activeModel}`;
+      } else {
+        modelDot.className = "dot";
+        modelLabel.textContent = "model —";
+      }
+    }
+
+    function setThinking(busy) {
+      if (busy) {
+        thinkingDot.className = "dot warn";
+        thinkingLabel.textContent = "thinking…";
+      } else {
+        thinkingDot.className = "dot";
+        thinkingLabel.textContent = "thinking idle";
+      }
+    }
+
+    async function fetchWithTimeout(url, opts, ms) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 1200);
+      const timer = setTimeout(() => controller.abort(), ms);
       try {
-        const res = await fetch(opencodeUrl + "/health", {
-          method: "GET",
-          mode: "cors",
-          signal: controller.signal,
-        });
+        const res = await fetch(url, { ...opts, signal: controller.signal });
         clearTimeout(timer);
-        if (res.ok || res.status === 404) {
-          opencodeReachable = true;
-          provider = "opencode";
-          providerLabel.textContent = "provider opencode";
-          setOpenCodeStatus("ok", `OpenCode ${opencodeUrl}`);
-          line("sys", `attached OpenCode at ${opencodeUrl}`);
-          return;
-        }
-        throw new Error(`status ${res.status}`);
+        return res;
       } catch (err) {
         clearTimeout(timer);
-        opencodeReachable = false;
-        provider = "demo";
-        providerLabel.textContent = "provider demo";
-        setOpenCodeStatus("warn", `OpenCode unreachable (${opencodeUrl})`);
+        throw err;
       }
+    }
+
+    async function resolveOpenCodeModel() {
+      try {
+        const res = await fetchWithTimeout(
+          opencodeUrl + "/v1/models",
+          { method: "GET", mode: "cors" },
+          1200,
+        );
+        if (!res.ok) return null;
+        const data = await res.json();
+        const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+        const first = list[0];
+        const id = first?.id || first?.name || first?.model;
+        return typeof id === "string" && id.trim() ? id.trim() : null;
+      } catch {
+        return null;
+      }
+    }
+
+    async function probeOpenCode() {
+      setOpenCodeStatus("", "OpenCode probing…");
+      setModelStatus(null);
+      const paths = ["/health", "/v1/models", "/"];
+      for (const path of paths) {
+        try {
+          const res = await fetchWithTimeout(
+            opencodeUrl + path,
+            { method: "GET", mode: "cors" },
+            1200,
+          );
+          // Any response from the loopback server counts as reachable.
+          if (res.status >= 200 && res.status < 500) {
+            opencodeReachable = true;
+            provider = "opencode";
+            providerDot.className = "dot ok";
+            providerLabel.textContent = "provider opencode";
+            setOpenCodeStatus("ok", `OpenCode ${opencodeUrl}`);
+            const model = await resolveOpenCodeModel();
+            setModelStatus(model || "opencode");
+            line("sys", `attached OpenCode at ${opencodeUrl}` + (model ? ` · ${model}` : ""));
+            return;
+          }
+        } catch {
+          // try next path
+        }
+      }
+      opencodeReachable = false;
+      provider = "demo";
+      providerDot.className = "dot ok";
+      providerLabel.textContent = "provider demo";
+      setOpenCodeStatus("warn", `OpenCode unreachable (${opencodeUrl})`);
+      setModelStatus(null);
     }
 
     async function sendPrompt(text) {
       line("user", `> ${text}`);
       if (provider === "opencode" && opencodeReachable) {
         sendBtn.disabled = true;
+        setThinking(true);
         try {
           const res = await fetch(opencodeUrl + "/v1/chat/completions", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
-              model: "opencode",
+              model: activeModel || "opencode",
               messages: [{ role: "user", content: text }],
               stream: false,
             }),
@@ -267,14 +334,15 @@
           line("assistant", String(content));
         } catch (err) {
           line("err", `OpenCode request failed: ${err.message || err}`);
-          line("sys", "falling back to local echo");
+          line("sys", "echo (OpenCode error)");
           line("assistant", text);
         } finally {
           sendBtn.disabled = false;
+          setThinking(false);
         }
         return;
       }
-      line("sys", "demo: no remote engine; echo only");
+      line("sys", "no engine attached; local echo");
       line("assistant", text);
     }
 
