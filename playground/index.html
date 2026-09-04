@@ -1,1 +1,248 @@
-PLACEHOLDER
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Huayra playground</title>
+  <style>
+    :root {
+      --bg: #0b0b0f;
+      --panel: #12121a;
+      --border: #2a2a36;
+      --text: #e8e8ef;
+      --muted: #8b8b9a;
+      --accent: #7aa2f7;
+      --ok: #9ece6a;
+      --warn: #e0af68;
+      --err: #f7768e;
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    #app {
+      display: grid;
+      grid-template-rows: auto auto auto 1fr auto;
+      height: 100%;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    header .brand { font-weight: 600; letter-spacing: 0.04em; }
+    header .credit { color: var(--muted); margin-left: auto; font-size: 11px; }
+    header a { color: var(--accent); text-decoration: none; }
+    header a:hover { text-decoration: underline; }
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      background: #0e0e14;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .dot.ok { background: var(--ok); }
+    .dot.warn { background: var(--warn); }
+    .dot.err { background: var(--err); }
+    #session-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      overflow-x: auto;
+      min-height: 36px;
+    }
+    #session-bar .label {
+      color: var(--muted);
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    #session-list {
+      display: flex;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+    .session-chip {
+      flex-shrink: 0;
+      font: inherit;
+      font-size: 11px;
+      background: #1a1a28;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 8px;
+      cursor: pointer;
+    }
+    .session-chip.active {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    #session-new {
+      flex-shrink: 0;
+      font: inherit;
+      font-size: 11px;
+      background: #1a1a28;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 10px;
+      cursor: pointer;
+    }
+    #log {
+      overflow: auto;
+      padding: 12px 14px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .line { margin: 0 0 6px; }
+    .line.sys { color: var(--muted); }
+    .line.user { color: var(--accent); }
+    .line.assistant { color: var(--text); }
+    .line.err { color: var(--err); }
+    footer {
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      padding: 10px 14px;
+    }
+    #prompt-form {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    #prompt {
+      flex: 1;
+      resize: vertical;
+      min-height: 44px;
+      max-height: 160px;
+      background: #0b0b0f;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font: inherit;
+    }
+    #prompt:focus { outline: 1px solid var(--accent); }
+    #send {
+      font: inherit;
+      background: #1a1a28;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+    #send:disabled { opacity: 0.5; cursor: default; }
+    #gate {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+    #gate.open { display: flex; }
+    #gate .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      width: min(360px, 92vw);
+    }
+    #gate label { display: block; margin-bottom: 6px; color: var(--muted); }
+    #gate input {
+      width: 100%;
+      background: #0b0b0f;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font: inherit;
+      margin-bottom: 12px;
+    }
+    #gate .actions { display: flex; gap: 8px; justify-content: flex-end; }
+    #gate button {
+      font: inherit;
+      background: #1a1a28;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <span class="brand">HUAYRA</span>
+      <span class="credit">Charles <a href="https://x.com/zanneth" target="_blank" rel="noopener">@zanneth</a> · MIT · fork qxlsz</span>
+    </header>
+    <div class="status-row" aria-live="polite">
+      <span class="pill"><span id="opencode-dot" class="dot"></span><span id="opencode-label">OpenCode …</span></span>
+      <span class="pill"><span id="provider-dot" class="dot"></span><span id="provider-label">provider none</span></span>
+      <span class="pill"><span id="agent-dot" class="dot"></span><span id="agent-label">agent —</span></span>
+      <span class="pill"><span id="model-dot" class="dot"></span><span id="model-label">model —</span></span>
+      <span class="pill"><span id="thinking-dot" class="dot"></span><span id="thinking-label">thinking idle</span></span>
+      <span class="pill"><span id="gate-dot" class="dot"></span><span id="gate-label">gate off</span></span>
+      <span class="pill"><span id="session-dot" class="dot ok"></span><span id="session-label">session 1</span></span>
+    </div>
+    <div id="session-bar" aria-label="Session index">
+      <span class="label">sessions</span>
+      <div id="session-list"></div>
+      <button type="button" id="session-new" title="New session">new</button>
+    </div>
+    <div id="log" role="log"></div>
+    <footer>
+      <form id="prompt-form">
+        <textarea id="prompt" rows="2" placeholder="prompt" autocomplete="off" spellcheck="false"></textarea>
+        <button type="submit" id="send">send</button>
+      </form>
+    </footer>
+  </div>
+
+  <div id="gate" aria-hidden="true">
+    <div class="card">
+      <label for="phrase">host gate (optional)</label>
+      <input id="phrase" type="password" autocomplete="current-password" placeholder="passphrase"/>
+      <div class="actions">
+        <button type="button" id="gate-skip">skip</button>
+        <button type="button" id="gate-unlock">unlock</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // CONTENT CONTINUED IN NEXT - WAIT THIS IS INCOMPLETE
+  </script>
+</body>
+</html>
