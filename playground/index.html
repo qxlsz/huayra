@@ -4,6 +4,696 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Huayra playground</title>
+  <style>
+    :root {
+      --bg: #0b0b0f;
+      --panel: #12121a;
+      --border: #2a2a36;
+      --text: #e8e8ef;
+      --muted: #8b8b9a;
+      --accent: #7aa2f7;
+      --ok: #9ece6a;
+      --warn: #e0af68;
+      --err: #f7768e;
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    #app {
+      display: grid;
+      grid-template-rows: auto auto auto 1fr auto;
+      height: 100%;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    header .brand { font-weight: 600; letter-spacing: 0.04em; }
+    header .credit { color: var(--muted); margin-left: auto; font-size: 11px; }
+    header a { color: var(--accent); text-decoration: none; }
+    header a:hover { text-decoration: underline; }
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      background: #0e0e14;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .dot.ok { background: var(--ok); }
+    .dot.warn { background: var(--warn); }
+    .dot.err { background: var(--err); }
+    #session-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      overflow-x: auto;
+      min-height: 36px;
+    }
+    #session-bar .label {
+      color: var(--muted);
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    #session-list {
+      display: flex;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+    .session-chip {
+      flex-shrink: 0;
+      font: inherit;
+      font-size: 11px;
+      background: #1a1a28;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    .session-chip.active {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    #session-new {
+      flex-shrink: 0;
+      font: inherit;
+      font-size: 11px;
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    #log {
+      overflow: auto;
+      padding: 12px 14px;
+      font-size: 12.5px;
+    }
+    .line { margin: 0 0 6px; white-space: pre-wrap; word-break: break-word; }
+    .line.sys { color: var(--muted); }
+    .line.user { color: var(--accent); }
+    .line.assistant { color: var(--text); }
+    .line.err { color: var(--err); }
+    footer {
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      padding: 10px 14px;
+    }
+    #prompt-form {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: end;
+    }
+    #prompt {
+      width: 100%;
+      resize: vertical;
+      min-height: 44px;
+      max-height: 160px;
+      background: #0b0b0f;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font: inherit;
+    }
+    #prompt:focus { outline: 1px solid var(--accent); }
+    #send {
+      font: inherit;
+      background: #1a1a28;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+    #send:disabled { opacity: 0.5; cursor: default; }
+    #gate {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+    #gate.open { display: flex; }
+    #gate .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      width: min(360px, 92vw);
+    }
+    #gate label { display: block; margin-bottom: 6px; color: var(--muted); }
+    #gate input {
+      width: 100%;
+      background: #0b0b0f;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font: inherit;
+      margin-bottom: 12px;
+    }
+    #gate .actions { display: flex; gap: 8px; justify-content: flex-end; }
+    #gate button {
+      font: inherit;
+      background: #1a1a28;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    #gate button:disabled { opacity: 0.45; cursor: default; }
+  </style>
 </head>
-<body>RESTORING - see next commit</body>
+<body>
+  <div id="app">
+    <header>
+      <span class="brand">HUAYRA</span>
+      <span class="credit">Credit: <a href="https://x.com/zanneth" target="_blank" rel="noopener">Charles @zanneth</a> · MIT</span>
+    </header>
+    <div class="status-row" aria-label="Status">
+      <span class="pill"><span id="opencode-dot" class="dot"></span><span id="opencode-label">OpenCode …</span></span>
+      <span class="pill"><span id="provider-dot" class="dot"></span><span id="provider-label">provider none</span></span>
+      <span class="pill"><span id="agent-dot" class="dot"></span><span id="agent-label">agent —</span></span>
+      <span class="pill"><span id="model-dot" class="dot"></span><span id="model-label">model —</span></span>
+      <span class="pill"><span id="thinking-dot" class="dot"></span><span id="thinking-label">thinking idle</span></span>
+      <span class="pill"><span id="gate-dot" class="dot"></span><span id="gate-label">gate off</span></span>
+      <span class="pill"><span id="session-dot" class="dot ok"></span><span id="session-label">session 1</span></span>
+    </div>
+    <div id="session-bar" aria-label="Session index">
+      <span class="label">sessions</span>
+      <div id="session-list"></div>
+      <button type="button" id="session-new">+ new</button>
+    </div>
+    <div id="log" role="log" aria-live="polite"></div>
+    <footer>
+      <form id="prompt-form">
+        <textarea id="prompt" rows="2" placeholder="prompt" autocomplete="off" spellcheck="false"></textarea>
+        <button type="submit" id="send">send</button>
+      </form>
+    </footer>
+  </div>
+  <div id="gate" aria-hidden="true">
+    <div class="card">
+      <label for="phrase">host gate (optional)</label>
+      <input id="phrase" type="password" autocomplete="current-password" placeholder="passphrase"/>
+      <div class="actions">
+        <button type="button" id="gate-skip">skip</button>
+        <button type="button" id="gate-unlock">unlock</button>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    const OPENCODE_DEFAULT = "http://127.0.0.1:4096";
+    const SESSION_STORE_KEY = "huayra.playground.sessions.v1";
+    const logEl = document.getElementById("log");
+    const form = document.getElementById("prompt-form");
+    const promptEl = document.getElementById("prompt");
+    const sendBtn = document.getElementById("send");
+    const opencodeDot = document.getElementById("opencode-dot");
+    const opencodeLabel = document.getElementById("opencode-label");
+    const providerDot = document.getElementById("provider-dot");
+    const providerLabel = document.getElementById("provider-label");
+    const agentDot = document.getElementById("agent-dot");
+    const agentLabel = document.getElementById("agent-label");
+    const modelDot = document.getElementById("model-dot");
+    const modelLabel = document.getElementById("model-label");
+    const thinkingDot = document.getElementById("thinking-dot");
+    const thinkingLabel = document.getElementById("thinking-label");
+    const gateDot = document.getElementById("gate-dot");
+    const gateLabel = document.getElementById("gate-label");
+    const sessionDot = document.getElementById("session-dot");
+    const sessionLabel = document.getElementById("session-label");
+    const sessionListEl = document.getElementById("session-list");
+    const sessionNewBtn = document.getElementById("session-new");
+    const gateOverlay = document.getElementById("gate");
+    const phraseInput = document.getElementById("phrase");
+    function resolveOpenCodeUrl() {
+      try {
+        const q = new URLSearchParams(location.search).get("opencode");
+        if (q && /^https?:\/\//i.test(q)) return q.replace(/\/+$/, "");
+      } catch {}
+      return OPENCODE_DEFAULT;
+    }
+    function resolveGateConfig() {
+      try {
+        const params = new URLSearchParams(location.search);
+        const hash = params.get("gate_hash");
+        const gateFlag = params.get("gate");
+        const requireGate = gateFlag === "1" || gateFlag === "true" || (typeof hash === "string" && /^[0-9a-f]{64}$/i.test(hash || ""));
+        const expectedHash = typeof hash === "string" && /^[0-9a-f]{64}$/i.test(hash) ? hash.toLowerCase() : null;
+        return { requireGate, expectedHash };
+      } catch {
+        return { requireGate: false, expectedHash: null };
+      }
+    }
+    async function sha256Hex(phrase) {
+      const data = new TextEncoder().encode(phrase);
+      const buf = await crypto.subtle.digest("SHA-256", data);
+      return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+    let provider = "none";
+    let opencodeUrl = resolveOpenCodeUrl();
+    let opencodeReachable = false;
+    let activeModel = null;
+    const gateConfig = resolveGateConfig();
+    let unlocked = !gateConfig.requireGate;
+    let probeTimer = null;
+    let sessions = [];
+    let activeSessionId = null;
+    let suppressPersist = false;
+    function uid() {
+      return `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+    function loadSessions() {
+      try {
+        const raw = localStorage.getItem(SESSION_STORE_KEY);
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.sessions) || typeof data.activeId !== "string") return null;
+        const cleaned = data.sessions.filter((s) => s && typeof s.id === "string" && Array.isArray(s.lines));
+        if (!cleaned.length) return null;
+        return { sessions: cleaned, activeId: data.activeId };
+      } catch { return null; }
+    }
+    function persistSessions() {
+      if (suppressPersist) return;
+      try {
+        localStorage.setItem(SESSION_STORE_KEY, JSON.stringify({ sessions, activeId: activeSessionId }));
+      } catch {}
+    }
+    function activeSession() {
+      return sessions.find((s) => s.id === activeSessionId) || null;
+    }
+    function renderSessionBar() {
+      sessionListEl.replaceChildren();
+      for (const s of sessions) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "session-chip" + (s.id === activeSessionId ? " active" : "");
+        btn.textContent = s.title || "session";
+        btn.title = s.title || s.id;
+        btn.addEventListener("click", () => switchSession(s.id));
+        sessionListEl.appendChild(btn);
+      }
+      const active = activeSession();
+      const idx = sessions.findIndex((s) => s.id === activeSessionId) + 1;
+      sessionLabel.textContent = active ? `session ${idx}/${sessions.length}` : "session —";
+      sessionDot.className = "dot ok";
+    }
+    function createSession(opts = {}) {
+      const s = { id: uid(), title: opts.title || `session ${sessions.length + 1}`, lines: [] };
+      sessions.push(s);
+      activeSessionId = s.id;
+      renderSessionBar();
+      persistSessions();
+      return s;
+    }
+    function switchSession(id) {
+      if (id === activeSessionId) return;
+      const s = sessions.find((x) => x.id === id);
+      if (!s) return;
+      activeSessionId = id;
+      suppressPersist = true;
+      logEl.replaceChildren();
+      for (const entry of s.lines) {
+        const p = document.createElement("div");
+        p.className = "line " + (entry.cls || "sys");
+        p.textContent = entry.text;
+        logEl.appendChild(p);
+      }
+      suppressPersist = false;
+      renderSessionBar();
+      persistSessions();
+    }
+    function ensureSession() {
+      const loaded = loadSessions();
+      if (loaded) {
+        sessions = loaded.sessions;
+        activeSessionId = loaded.activeId;
+        if (!sessions.find((s) => s.id === activeSessionId)) activeSessionId = sessions[0].id;
+        suppressPersist = true;
+        logEl.replaceChildren();
+        const active = activeSession();
+        if (active) {
+          for (const entry of active.lines) {
+            const p = document.createElement("div");
+            p.className = "line " + (entry.cls || "sys");
+            p.textContent = entry.text;
+            logEl.appendChild(p);
+          }
+        }
+        suppressPersist = false;
+        renderSessionBar();
+        return;
+      }
+      createSession({ title: "session 1" });
+    }
+    function line(cls, text) {
+      const p = document.createElement("div");
+      p.className = "line " + cls;
+      p.textContent = text;
+      logEl.appendChild(p);
+      logEl.scrollTop = logEl.scrollHeight;
+      const s = activeSession();
+      if (s) {
+        s.lines.push({ cls, text });
+        if (s.lines.length > 400) s.lines = s.lines.slice(-400);
+        persistSessions();
+      }
+    }
+    function setOpenCodeStatus(kind, label) {
+      opencodeDot.className = "dot" + (kind ? " " + kind : "");
+      opencodeLabel.textContent = label;
+    }
+    function setAgentStatus(name) {
+      if (!name) {
+        agentDot.className = "dot";
+        agentLabel.textContent = "agent —";
+        return;
+      }
+      agentDot.className = "dot ok";
+      agentLabel.textContent = "agent " + name;
+    }
+    function setModelStatus(name) {
+      activeModel = name;
+      if (!name) {
+        modelDot.className = "dot";
+        modelLabel.textContent = "model —";
+        return;
+      }
+      modelDot.className = "dot ok";
+      modelLabel.textContent = "model " + name;
+    }
+    function setThinking(on) {
+      thinkingDot.className = "dot" + (on ? " warn" : "");
+      thinkingLabel.textContent = on ? "thinking…" : "thinking idle";
+    }
+    async function fetchWithTimeout(url, opts, ms) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), ms);
+      try {
+        return await fetch(url, { ...opts, signal: ctrl.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    async function resolveOpenCodeModel() {
+      try {
+        const res = await fetchWithTimeout(opencodeUrl + "/v1/models", { method: "GET", mode: "cors" }, 1200);
+        if (!res.ok) return null;
+        const data = await res.json();
+        const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+        const first = list[0];
+        const id = first?.id || first?.name || first?.model;
+        return typeof id === "string" && id.trim() ? id.trim() : null;
+      } catch { return null; }
+    }
+    function stopProbeTimer() {
+      if (probeTimer != null) { clearInterval(probeTimer); probeTimer = null; }
+    }
+    function startProbeTimer() {
+      if (probeTimer != null) return;
+      probeTimer = setInterval(() => { if (!opencodeReachable) probeOpenCode({ quiet: true }); }, 12000);
+    }
+    async function probeOpenCode(opts = {}) {
+      const quiet = !!opts.quiet;
+      if (!quiet) setOpenCodeStatus("", "OpenCode probing…");
+      if (!quiet) setModelStatus(null);
+      const paths = ["/health", "/v1/models", "/"];
+      for (const path of paths) {
+        try {
+          const res = await fetchWithTimeout(opencodeUrl + path, { method: "GET", mode: "cors" }, 1200);
+          if (res.status >= 200 && res.status < 500) {
+            opencodeReachable = true;
+            provider = "opencode";
+            providerDot.className = "dot ok";
+            providerLabel.textContent = "provider opencode";
+            setOpenCodeStatus("ok", `OpenCode ${opencodeUrl}`);
+            setAgentStatus("opencode");
+            const model = await resolveOpenCodeModel();
+            setModelStatus(model || "opencode");
+            stopProbeTimer();
+            if (!quiet) line("sys", `attached OpenCode at ${opencodeUrl}` + (model ? ` · ${model}` : ""));
+            else line("sys", `OpenCode became reachable · ${opencodeUrl}` + (model ? ` · ${model}` : ""));
+            return;
+          }
+        } catch {}
+      }
+      opencodeReachable = false;
+      provider = "none";
+      providerDot.className = "dot";
+      providerLabel.textContent = "provider none";
+      setOpenCodeStatus("warn", `OpenCode unreachable (${opencodeUrl})`);
+      if (!quiet) { setModelStatus(null); setAgentStatus(null); }
+      startProbeTimer();
+    }
+    function appendAssistantStream() {
+      const p = document.createElement("div");
+      p.className = "line assistant";
+      p.textContent = "";
+      logEl.appendChild(p);
+      logEl.scrollTop = logEl.scrollHeight;
+      return p;
+    }
+    function finalizeAssistantLine(el, full) {
+      el.textContent = full;
+      const s = activeSession();
+      if (s) {
+        s.lines.push({ cls: "assistant", text: full });
+        if (s.lines.length > 400) s.lines = s.lines.slice(-400);
+        persistSessions();
+      }
+    }
+    async function consumeOpenCodeStream(res, streamEl) {
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let full = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n");
+        buffer = parts.pop() || "";
+        for (const raw of parts) {
+          const line = raw.trim();
+          if (!line.startsWith("data:")) continue;
+          const payload = line.slice(5).trim();
+          if (payload === "[DONE]") continue;
+          try {
+            const json = JSON.parse(payload);
+            const delta = json?.choices?.[0]?.delta?.content ?? json?.choices?.[0]?.message?.content ?? "";
+            if (delta) {
+              full += delta;
+              streamEl.textContent = full;
+              logEl.scrollTop = logEl.scrollHeight;
+            }
+          } catch {}
+        }
+      }
+      return full;
+    }
+    function historyMessages(latestUserText) {
+      const s = activeSession();
+      const messages = [];
+      if (s) {
+        for (const entry of s.lines) {
+          if (entry.cls === "user") {
+            const content = entry.text.replace(/^you:\\s*/i, "");
+            if (content) messages.push({ role: "user", content });
+          } else if (entry.cls === "assistant") {
+            messages.push({ role: "assistant", content: entry.text });
+          }
+        }
+      }
+      if (latestUserText && (messages.length === 0 || messages[messages.length - 1].role !== "user" || messages[messages.length - 1].content !== latestUserText)) {
+        messages.push({ role: "user", content: latestUserText });
+      }
+      return messages.slice(-24);
+    }
+    async function sendPrompt(text) {
+      line("user", "you: " + text);
+      sendBtn.disabled = true;
+      setThinking(true);
+      if (!opencodeReachable) {
+        await probeOpenCode({ quiet: true });
+      }
+      if (opencodeReachable) {
+        try {
+          const bodyBase = {
+            model: activeModel || "opencode",
+            messages: historyMessages(text),
+          };
+          let res = await fetch(opencodeUrl + "/v1/chat/completions", {
+            method: "POST",
+            headers: { "content-type": "application/json", accept: "text/event-stream" },
+            body: JSON.stringify({ ...bodyBase, stream: true }),
+          });
+          if (res.ok && res.body) {
+            const streamEl = appendAssistantStream();
+            const full = await consumeOpenCodeStream(res, streamEl);
+            if (full) finalizeAssistantLine(streamEl, full);
+            else if (!streamEl.textContent) {
+              streamEl.remove();
+              res = await fetch(opencodeUrl + "/v1/chat/completions", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ ...bodyBase, stream: false }),
+              });
+              if (!res.ok) {
+                const errBody = await res.text().catch(() => "");
+                throw new Error(`OpenCode ${res.status} ${errBody.slice(0, 200)}`);
+              }
+              const data = await res.json();
+              const content = data?.choices?.[0]?.message?.content ?? data?.message?.content ?? JSON.stringify(data).slice(0, 500);
+              line("assistant", String(content));
+            }
+          } else if (res.status === 404 || res.status === 405) {
+            res = await fetch(opencodeUrl + "/v1/chat/completions", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ ...bodyBase, stream: false }),
+            });
+            if (!res.ok) {
+              const errBody = await res.text().catch(() => "");
+              throw new Error(`OpenCode ${res.status} ${errBody.slice(0, 200)}`);
+            }
+            const data = await res.json();
+            const content = data?.choices?.[0]?.message?.content ?? data?.message?.content ?? JSON.stringify(data).slice(0, 500);
+            line("assistant", String(content));
+          } else {
+            const errBody = await res.text().catch(() => "");
+            throw new Error(`OpenCode ${res.status} ${errBody.slice(0, 200)}`);
+          }
+        } catch (err) {
+          line("err", `OpenCode request failed: ${err.message || err}`);
+        } finally {
+          sendBtn.disabled = false;
+          setThinking(false);
+        }
+        return;
+      }
+      line("sys", `no engine attached · start opencode serve --port 4096 or open with ?opencode=URL (tried ${opencodeUrl})`);
+      sendBtn.disabled = false;
+      setThinking(false);
+    }
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (!unlocked) {
+        gateOverlay.classList.add("open");
+        gateOverlay.setAttribute("aria-hidden", "false");
+        return;
+      }
+      const text = promptEl.value.trim();
+      if (!text) return;
+      promptEl.value = "";
+      sendPrompt(text);
+    });
+    promptEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+    sessionNewBtn.addEventListener("click", () => {
+      const n = sessions.length + 1;
+      createSession({ title: `session ${n}` });
+      line("sys", `new session ${n}`);
+      line("sys", "Credit: Charles @zanneth · MIT");
+    });
+    const gateSkipBtn = document.getElementById("gate-skip");
+    const gateUnlockBtn = document.getElementById("gate-unlock");
+    if (gateConfig.expectedHash) {
+      gateSkipBtn.disabled = true;
+      gateSkipBtn.title = "skip disabled when gate_hash is set";
+    }
+    gateSkipBtn.addEventListener("click", () => {
+      if (gateConfig.expectedHash) return;
+      unlocked = true;
+      gateOverlay.classList.remove("open");
+      gateOverlay.setAttribute("aria-hidden", "true");
+      gateDot.className = "dot";
+      gateLabel.textContent = "gate off";
+      promptEl.focus();
+    });
+    gateUnlockBtn.addEventListener("click", async () => {
+      const phrase = phraseInput.value;
+      if (!phrase) { line("err", "empty passphrase"); return; }
+      if (gateConfig.expectedHash) {
+        const actual = await sha256Hex(phrase);
+        if (actual !== gateConfig.expectedHash) {
+          line("err", "host gate rejected");
+          phraseInput.value = "";
+          phraseInput.focus();
+          return;
+        }
+      }
+      unlocked = true;
+      phraseInput.value = "";
+      gateOverlay.classList.remove("open");
+      gateOverlay.setAttribute("aria-hidden", "true");
+      gateDot.className = "dot ok";
+      gateLabel.textContent = gateConfig.expectedHash ? "gate hash" : "gate local";
+      line("sys", "host gate accepted (client-side only in playground)");
+      promptEl.focus();
+    });
+    phraseInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        gateUnlockBtn.click();
+      }
+    });
+    ensureSession();
+    if (!activeSession().lines.length) {
+      line("sys", "Huayra playground ready");
+      line("sys", "Credit: Charles @zanneth · MIT");
+      if (gateConfig.requireGate) {
+        line("sys", "host gate on · unlock required before send (?gate=1 or ?gate_hash=…)");
+        gateDot.className = "dot warn";
+        gateLabel.textContent = "gate locked";
+      }
+    }
+    // Gate never blocks first paint: overlay only opens on send while locked.
+    promptEl.focus();
+    probeOpenCode();
+  </script>
+</body>
 </html>
