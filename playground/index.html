@@ -99,35 +99,35 @@
       color: var(--muted);
       border: 1px solid var(--border);
       border-radius: 4px;
-      padding: 4px 8px;
+      padding: 3px 8px;
       cursor: pointer;
-      max-width: 140px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
-    .session-chip:hover { border-color: var(--accent); color: var(--accent); }
     .session-chip.active {
       color: var(--text);
       border-color: var(--accent);
-      background: #1e1e30;
     }
     #session-new {
       flex-shrink: 0;
+      font: inherit;
       font-size: 11px;
-      padding: 4px 8px;
+      background: #1a1a28;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 10px;
+      cursor: pointer;
     }
     #log {
+      overflow: auto;
       padding: 12px 14px;
-      overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-word;
     }
-    #log .line { margin: 0 0 6px; }
-    #log .sys { color: var(--muted); }
-    #log .user { color: var(--accent); }
-    #log .assistant { color: var(--text); }
-    #log .err { color: var(--err); }
+    .line { margin: 0 0 6px; }
+    .line.sys { color: var(--muted); }
+    .line.user { color: var(--accent); }
+    .line.assistant { color: var(--text); }
+    .line.err { color: var(--err); }
     footer {
       border-top: 1px solid var(--border);
       background: var(--panel);
@@ -140,31 +140,27 @@
     }
     #prompt {
       flex: 1;
+      resize: vertical;
       min-height: 44px;
       max-height: 160px;
-      resize: vertical;
-      background: var(--bg);
+      background: #0b0b0f;
       color: var(--text);
       border: 1px solid var(--border);
-      border-radius: 4px;
+      border-radius: 6px;
       padding: 8px 10px;
       font: inherit;
     }
-    #prompt:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-    button {
+    #prompt:focus { outline: 1px solid var(--accent); }
+    #send {
       font: inherit;
       background: #1a1a28;
       color: var(--text);
       border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 8px 12px;
+      border-radius: 6px;
+      padding: 8px 14px;
       cursor: pointer;
     }
-    button:hover { border-color: var(--accent); color: var(--accent); }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #send:disabled { opacity: 0.5; cursor: default; }
     #gate {
       display: none;
       position: fixed;
@@ -176,24 +172,33 @@
     }
     #gate.open { display: flex; }
     #gate .card {
-      width: min(360px, 92vw);
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: 8px;
       padding: 16px;
+      width: min(360px, 92vw);
     }
     #gate label { display: block; margin-bottom: 6px; color: var(--muted); }
     #gate input {
       width: 100%;
-      background: var(--bg);
+      background: #0b0b0f;
       color: var(--text);
       border: 1px solid var(--border);
-      border-radius: 4px;
+      border-radius: 6px;
       padding: 8px 10px;
       font: inherit;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
     #gate .actions { display: flex; gap: 8px; justify-content: flex-end; }
+    #gate button {
+      font: inherit;
+      background: #1a1a28;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -205,6 +210,7 @@
     <div class="status-row" aria-live="polite">
       <span class="pill"><span id="opencode-dot" class="dot"></span><span id="opencode-label">OpenCode …</span></span>
       <span class="pill"><span id="provider-dot" class="dot"></span><span id="provider-label">provider none</span></span>
+      <span class="pill"><span id="agent-dot" class="dot"></span><span id="agent-label">agent —</span></span>
       <span class="pill"><span id="model-dot" class="dot"></span><span id="model-label">model —</span></span>
       <span class="pill"><span id="thinking-dot" class="dot"></span><span id="thinking-label">thinking idle</span></span>
       <span class="pill"><span id="gate-dot" class="dot"></span><span id="gate-label">gate off</span></span>
@@ -246,6 +252,8 @@
     const opencodeLabel = document.getElementById("opencode-label");
     const providerDot = document.getElementById("provider-dot");
     const providerLabel = document.getElementById("provider-label");
+    const agentDot = document.getElementById("agent-dot");
+    const agentLabel = document.getElementById("agent-label");
     const modelDot = document.getElementById("model-dot");
     const modelLabel = document.getElementById("model-label");
     const thinkingDot = document.getElementById("thinking-dot");
@@ -412,6 +420,36 @@
       }
     }
 
+    function setAgentStatus(name) {
+      if (name) {
+        agentDot.className = "dot ok";
+        agentLabel.textContent = `agent ${name}`;
+      } else {
+        agentDot.className = "dot";
+        agentLabel.textContent = "agent —";
+      }
+    }
+
+    function sessionHistoryToMessages(session, latestUserText) {
+      const messages = [];
+      if (session && Array.isArray(session.lines)) {
+        for (const entry of session.lines) {
+          if (!entry || typeof entry.text !== "string") continue;
+          if (entry.cls === "user") {
+            const content = entry.text.replace(/^>\s*/, "");
+            if (content) messages.push({ role: "user", content });
+          } else if (entry.cls === "assistant") {
+            messages.push({ role: "assistant", content: entry.text });
+          }
+        }
+      }
+      // line() already appended the latest user turn; avoid double-append if called before line
+      if (latestUserText && (messages.length === 0 || messages[messages.length - 1].role !== "user" || messages[messages.length - 1].content !== latestUserText)) {
+        messages.push({ role: "user", content: latestUserText });
+      }
+      return messages;
+    }
+
     function setThinking(busy) {
       if (busy) {
         thinkingDot.className = "dot warn";
@@ -487,6 +525,7 @@
             providerDot.className = "dot ok";
             providerLabel.textContent = "provider opencode";
             setOpenCodeStatus("ok", `OpenCode ${opencodeUrl}`);
+            setAgentStatus("opencode");
             const model = await resolveOpenCodeModel();
             setModelStatus(model || "opencode");
             stopProbeTimer();
@@ -506,7 +545,10 @@
       providerDot.className = "dot";
       providerLabel.textContent = "provider none";
       setOpenCodeStatus("warn", `OpenCode unreachable (${opencodeUrl})`);
-      if (!quiet) setModelStatus(null);
+      if (!quiet) {
+        setModelStatus(null);
+        setAgentStatus(null);
+      }
       startProbeTimer();
     }
 
@@ -516,12 +558,13 @@
         sendBtn.disabled = true;
         setThinking(true);
         try {
+          const messages = sessionHistoryToMessages(activeSession(), text);
           const res = await fetch(opencodeUrl + "/v1/chat/completions", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               model: activeModel || "opencode",
-              messages: [{ role: "user", content: text }],
+              messages,
               stream: false,
             }),
           });
@@ -537,8 +580,6 @@
           line("assistant", String(content));
         } catch (err) {
           line("err", `OpenCode request failed: ${err.message || err}`);
-          line("sys", "echo (OpenCode error)");
-          line("assistant", text);
         } finally {
           sendBtn.disabled = false;
           setThinking(false);
