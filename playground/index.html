@@ -29,7 +29,7 @@
     }
     #app {
       display: grid;
-      grid-template-rows: auto auto 1fr auto;
+      grid-template-rows: auto auto auto 1fr auto;
       height: 100%;
       max-width: 960px;
       margin: 0 auto;
@@ -70,6 +70,53 @@
     .dot.ok { background: var(--ok); }
     .dot.warn { background: var(--warn); }
     .dot.err { background: var(--err); }
+    #session-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      overflow-x: auto;
+      min-height: 36px;
+    }
+    #session-bar .label {
+      color: var(--muted);
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    #session-list {
+      display: flex;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+    .session-chip {
+      flex-shrink: 0;
+      font: inherit;
+      font-size: 11px;
+      background: #1a1a28;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .session-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .session-chip.active {
+      color: var(--text);
+      border-color: var(--accent);
+      background: #1e1e30;
+    }
+    #session-new {
+      flex-shrink: 0;
+      font-size: 11px;
+      padding: 4px 8px;
+    }
     #log {
       padding: 12px 14px;
       overflow-y: auto;
@@ -161,6 +208,12 @@
       <span class="pill"><span id="model-dot" class="dot"></span><span id="model-label">model —</span></span>
       <span class="pill"><span id="thinking-dot" class="dot"></span><span id="thinking-label">thinking idle</span></span>
       <span class="pill"><span id="gate-dot" class="dot"></span><span id="gate-label">gate off</span></span>
+      <span class="pill"><span id="session-dot" class="dot ok"></span><span id="session-label">session 1</span></span>
+    </div>
+    <div id="session-bar" aria-label="Session index">
+      <span class="label">sessions</span>
+      <div id="session-list"></div>
+      <button type="button" id="session-new" title="New session">new</button>
     </div>
     <div id="log" role="log"></div>
     <footer>
@@ -184,6 +237,7 @@
 
   <script type="module">
     const OPENCODE_DEFAULT = "http://127.0.0.1:4096";
+    const SESSION_STORE_KEY = "huayra.playground.sessions.v1";
     const logEl = document.getElementById("log");
     const form = document.getElementById("prompt-form");
     const promptEl = document.getElementById("prompt");
@@ -198,6 +252,10 @@
     const thinkingLabel = document.getElementById("thinking-label");
     const gateDot = document.getElementById("gate-dot");
     const gateLabel = document.getElementById("gate-label");
+    const sessionDot = document.getElementById("session-dot");
+    const sessionLabel = document.getElementById("session-label");
+    const sessionListEl = document.getElementById("session-list");
+    const sessionNewBtn = document.getElementById("session-new");
     const gateOverlay = document.getElementById("gate");
     const phraseInput = document.getElementById("phrase");
 
@@ -208,12 +266,134 @@
     let unlocked = true;
     let probeTimer = null;
 
+    /** @type {{ id: string, title: string, created: number, lines: { cls: string, text: string }[] }[]} */
+    let sessions = [];
+    let activeSessionId = null;
+    let suppressPersist = false;
+
+    function uid() {
+      return `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function loadSessions() {
+      try {
+        const raw = localStorage.getItem(SESSION_STORE_KEY);
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.sessions) || typeof data.activeId !== "string") return null;
+        const cleaned = data.sessions.filter(
+          (s) => s && typeof s.id === "string" && Array.isArray(s.lines),
+        );
+        if (!cleaned.length) return null;
+        return { sessions: cleaned, activeId: data.activeId };
+      } catch {
+        return null;
+      }
+    }
+
+    function persistSessions() {
+      if (suppressPersist) return;
+      try {
+        localStorage.setItem(
+          SESSION_STORE_KEY,
+          JSON.stringify({ sessions, activeId: activeSessionId }),
+        );
+      } catch {
+        // quota or private mode
+      }
+    }
+
+    function activeSession() {
+      return sessions.find((s) => s.id === activeSessionId) || null;
+    }
+
+    function renderSessionBar() {
+      sessionListEl.replaceChildren();
+      for (const s of sessions) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "session-chip" + (s.id === activeSessionId ? " active" : "");
+        btn.textContent = s.title || "session";
+        btn.title = s.title || s.id;
+        btn.addEventListener("click", () => switchSession(s.id));
+        sessionListEl.appendChild(btn);
+      }
+      const active = activeSession();
+      const idx = sessions.findIndex((s) => s.id === activeSessionId) + 1;
+      sessionLabel.textContent = active
+        ? `session ${idx}/${sessions.length}`
+        : "session —";
+      sessionDot.className = "dot ok";
+    }
+
+    function paintLogFromSession(session) {
+      suppressPersist = true;
+      logEl.replaceChildren();
+      for (const entry of session.lines) {
+        const p = document.createElement("div");
+        p.className = `line ${entry.cls}`;
+        p.textContent = entry.text;
+        logEl.appendChild(p);
+      }
+      logEl.scrollTop = logEl.scrollHeight;
+      suppressPersist = false;
+    }
+
+    function switchSession(id) {
+      const next = sessions.find((s) => s.id === id);
+      if (!next || next.id === activeSessionId) return;
+      activeSessionId = next.id;
+      paintLogFromSession(next);
+      renderSessionBar();
+      persistSessions();
+    }
+
+    function createSession(opts = {}) {
+      const session = {
+        id: uid(),
+        title: opts.title || `session ${sessions.length + 1}`,
+        created: Date.now(),
+        lines: [],
+      };
+      sessions.push(session);
+      activeSessionId = session.id;
+      paintLogFromSession(session);
+      renderSessionBar();
+      persistSessions();
+      return session;
+    }
+
+    function ensureSession() {
+      if (activeSession()) return activeSession();
+      const loaded = loadSessions();
+      if (loaded) {
+        sessions = loaded.sessions;
+        activeSessionId = loaded.sessions.some((s) => s.id === loaded.activeId)
+          ? loaded.activeId
+          : loaded.sessions[loaded.sessions.length - 1].id;
+        paintLogFromSession(activeSession());
+        renderSessionBar();
+        return activeSession();
+      }
+      return createSession({ title: "session 1" });
+    }
+
     function line(cls, text) {
       const p = document.createElement("div");
       p.className = `line ${cls}`;
       p.textContent = text;
       logEl.appendChild(p);
       logEl.scrollTop = logEl.scrollHeight;
+      const session = activeSession();
+      if (session && !suppressPersist) {
+        session.lines.push({ cls, text });
+        if (cls === "user" && session.lines.filter((l) => l.cls === "user").length === 1) {
+          const title = text.replace(/^>\s*/, "").trim().slice(0, 40);
+          if (title) session.title = title;
+          renderSessionBar();
+        }
+        persistSessions();
+      }
     }
 
     function setOpenCodeStatus(state, detail) {
@@ -389,6 +569,13 @@
       }
     });
 
+    sessionNewBtn.addEventListener("click", () => {
+      const n = sessions.length + 1;
+      createSession({ title: `session ${n}` });
+      line("sys", `new session ${n}`);
+      line("sys", "Credit: Charles @zanneth · MIT");
+    });
+
     document.getElementById("gate-skip").addEventListener("click", () => {
       unlocked = true;
       gateOverlay.classList.remove("open");
@@ -413,8 +600,11 @@
     });
 
     // First paint is never blocked by gate or OpenCode probe.
-    line("sys", "Huayra playground ready");
-    line("sys", "Credit: Charles @zanneth · MIT");
+    ensureSession();
+    if (!activeSession().lines.length) {
+      line("sys", "Huayra playground ready");
+      line("sys", "Credit: Charles @zanneth · MIT");
+    }
     probeOpenCode();
   </script>
 </body>
