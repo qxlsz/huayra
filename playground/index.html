@@ -145,7 +145,7 @@
     }
     #prompt-form {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 1fr auto auto;
       gap: 8px;
       align-items: end;
     }
@@ -162,7 +162,8 @@
       font: inherit;
     }
     #prompt:focus { outline: 1px solid var(--accent); }
-    #send {
+    #send,
+    #stop {
       font: inherit;
       background: #1a1a28;
       color: var(--text);
@@ -171,7 +172,10 @@
       padding: 8px 14px;
       cursor: pointer;
     }
-    #send:disabled { opacity: 0.5; cursor: default; }
+    #send:disabled,
+    #stop:disabled { opacity: 0.5; cursor: default; }
+    #stop { color: var(--err); display: none; }
+    #stop.visible { display: inline-block; }
     #gate {
       display: none;
       position: fixed;
@@ -239,6 +243,7 @@
       <form id="prompt-form">
         <textarea id="prompt" rows="2" placeholder="prompt" autocomplete="off" spellcheck="false"></textarea>
         <button type="submit" id="send">send</button>
+        <button type="button" id="stop" title="abort in-flight OpenCode request (Esc)">stop</button>
       </form>
     </footer>
   </div>
@@ -258,6 +263,7 @@
     const form = document.getElementById("prompt-form");
     const promptEl = document.getElementById("prompt");
     const sendBtn = document.getElementById("send");
+    const stopBtn = document.getElementById("stop");
     const opencodeDot = document.getElementById("opencode-dot");
     const opencodeLabel = document.getElementById("opencode-label");
     const providerDot = document.getElementById("provider-dot");
@@ -318,6 +324,7 @@
     let opencodeUrl = resolveOpenCodeUrl();
     let opencodeReachable = false;
     let activeModel = null;
+    let abortController = null;
     const gateConfig = resolveGateConfig();
     let unlocked = !gateConfig.requireGate;
     let probeTimer = null;
@@ -332,10 +339,8 @@
         const raw = localStorage.getItem(SESSION_STORE_KEY);
         if (!raw) return null;
         const data = JSON.parse(raw);
-        if (!data || !Array.isArray(data.sessions) || typeof data.activeId !== "string") return null;
-        const cleaned = data.sessions.filter((s) => s && typeof s.id === "string" && Array.isArray(s.lines));
-        if (!cleaned.length) return null;
-        return { sessions: cleaned, activeId: data.activeId };
+        if (!data || !Array.isArray(data.sessions) || !data.sessions.length) return null;
+        return data;
       } catch { return null; }
     }
     function persistSessions() {
@@ -353,18 +358,16 @@
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "session-chip" + (s.id === activeSessionId ? " active" : "");
-        btn.textContent = s.title || "session";
-        btn.title = s.title || s.id;
+        btn.textContent = s.title || s.id;
         btn.addEventListener("click", () => switchSession(s.id));
         sessionListEl.appendChild(btn);
       }
       const active = activeSession();
       const idx = sessions.findIndex((s) => s.id === activeSessionId) + 1;
-      sessionLabel.textContent = active ? `session ${idx}/${sessions.length}` : "session -";
-      sessionDot.className = "dot ok";
+      sessionLabel.textContent = "session " + idx + "/" + sessions.length;
     }
     function createSession(opts = {}) {
-      const s = { id: uid(), title: opts.title || `session ${sessions.length + 1}`, lines: [] };
+      const s = { id: uid(), title: opts.title || ("session " + (sessions.length + 1)), lines: [] };
       sessions.push(s);
       activeSessionId = s.id;
       renderSessionBar();
@@ -543,32 +546,42 @@
         persistSessions();
       }
     }
-    async function consumeOpenCodeStream(res, streamEl) {
+    async function consumeOpenCodeStream(res, streamEl, signal) {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
       let full = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n");
-        buffer = parts.pop() || "";
-        for (const raw of parts) {
-          const line = raw.trim();
-          if (!line.startsWith("data:")) continue;
-          const payload = line.slice(5).trim();
-          if (payload === "[DONE]") continue;
-          try {
-            const json = JSON.parse(payload);
-            const delta = json?.choices?.[0]?.delta?.content ?? json?.choices?.[0]?.message?.content ?? "";
-            if (delta) {
-              full += delta;
-              streamEl.textContent = full;
-              logEl.scrollTop = logEl.scrollHeight;
-            }
-          } catch {}
+      const onAbort = () => { try { reader.cancel(); } catch {} };
+      if (signal) {
+        if (signal.aborted) { onAbort(); return full; }
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+      try {
+        while (true) {
+          if (signal && signal.aborted) break;
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n");
+          buffer = parts.pop() || "";
+          for (const raw of parts) {
+            const line = raw.trim();
+            if (!line.startsWith("data:")) continue;
+            const payload = line.slice(5).trim();
+            if (payload === "[DONE]") continue;
+            try {
+              const json = JSON.parse(payload);
+              const delta = json?.choices?.[0]?.delta?.content ?? json?.choices?.[0]?.message?.content ?? "";
+              if (delta) {
+                full += delta;
+                streamEl.textContent = full;
+                logEl.scrollTop = logEl.scrollHeight;
+              }
+            } catch {}
+          }
         }
+      } finally {
+        if (signal) signal.removeEventListener("abort", onAbort);
       }
       return full;
     }
@@ -590,11 +603,34 @@
       }
       return messages.slice(-24);
     }
+    function setInFlight(on) {
+      sendBtn.disabled = on;
+      if (on) {
+        stopBtn.classList.add("visible");
+        stopBtn.disabled = false;
+      } else {
+        stopBtn.classList.remove("visible");
+        stopBtn.disabled = true;
+      }
+      setThinking(on);
+    }
+    function abortInFlight() {
+      if (!abortController) return;
+      abortController.abort();
+      abortController = null;
+      line("sys", "request aborted");
+      setInFlight(false);
+      promptEl.focus();
+    }
     async function sendPrompt(text) {
       line("user", "you: " + text);
       maybeAutoTitle(text);
-      sendBtn.disabled = true;
-      setThinking(true);
+      if (abortController) {
+        try { abortController.abort(); } catch {}
+      }
+      abortController = new AbortController();
+      const signal = abortController.signal;
+      setInFlight(true);
       if (!opencodeReachable) {
         await probeOpenCode({ quiet: true });
       }
@@ -608,10 +644,17 @@
             method: "POST",
             headers: { "content-type": "application/json", accept: "text/event-stream" },
             body: JSON.stringify({ ...bodyBase, stream: true }),
+            signal,
           });
+          if (signal.aborted) return;
           if (res.ok && res.body) {
             const streamEl = appendAssistantStream();
-            const full = await consumeOpenCodeStream(res, streamEl);
+            const full = await consumeOpenCodeStream(res, streamEl, signal);
+            if (signal.aborted) {
+              if (full) finalizeAssistantLine(streamEl, full + " [aborted]");
+              else streamEl.remove();
+              return;
+            }
             if (full) finalizeAssistantLine(streamEl, full);
             else if (!streamEl.textContent) {
               streamEl.remove();
@@ -619,7 +662,9 @@
                 method: "POST",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({ ...bodyBase, stream: false }),
+                signal,
               });
+              if (signal.aborted) return;
               if (!res.ok) {
                 const errBody = await res.text().catch(() => "");
                 throw new Error(`OpenCode ${res.status} ${errBody.slice(0, 200)}`);
@@ -633,7 +678,9 @@
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ ...bodyBase, stream: false }),
+              signal,
             });
+            if (signal.aborted) return;
             if (!res.ok) {
               const errBody = await res.text().catch(() => "");
               throw new Error(`OpenCode ${res.status} ${errBody.slice(0, 200)}`);
@@ -646,16 +693,20 @@
             throw new Error(`OpenCode ${res.status} ${errBody.slice(0, 200)}`);
           }
         } catch (err) {
-          line("err", `OpenCode request failed: ${err.message || err}`);
+          if (err && (err.name === "AbortError" || signal.aborted)) {
+            // abortInFlight already logged when user-triggered
+          } else {
+            line("err", `OpenCode request failed: ${err.message || err}`);
+          }
         } finally {
-          sendBtn.disabled = false;
-          setThinking(false);
+          abortController = null;
+          setInFlight(false);
         }
         return;
       }
       line("sys", `no engine attached · start opencode serve --port 4096 or open with ?opencode=URL (tried ${opencodeUrl})`);
-      sendBtn.disabled = false;
-      setThinking(false);
+      abortController = null;
+      setInFlight(false);
     }
     form.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -673,6 +724,14 @@
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         form.requestSubmit();
+      }
+    });
+    stopBtn.addEventListener("click", () => abortInFlight());
+    stopBtn.disabled = true;
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && abortController) {
+        e.preventDefault();
+        abortInFlight();
       }
     });
     sessionNewBtn.addEventListener("click", () => {
