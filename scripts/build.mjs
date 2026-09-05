@@ -7,4 +7,3 @@ const dist = join(root, "dist");
 
 await mkdir(dist, { recursive: true });
 await copyFile(join(root, "playground", "index.html"), join(dist, "index.html"));
-await copyFile(join(root, "playground", "app.js"), join(dist, "app.js"));
