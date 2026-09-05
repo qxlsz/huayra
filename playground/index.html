@@ -61,6 +61,15 @@
       align-items: center;
       gap: 6px;
     }
+    .pill.reprobe {
+      cursor: pointer;
+      border-radius: 4px;
+      padding: 0 4px;
+    }
+    .pill.reprobe:hover {
+      color: var(--text);
+      background: #1a1a28;
+    }
     .dot {
       width: 7px;
       height: 7px;
@@ -209,10 +218,10 @@
       <span class="credit">Credit: <a href="https://x.com/zanneth" target="_blank" rel="noopener">Charles @zanneth</a> · MIT</span>
     </header>
     <div class="status-row" aria-label="Status">
-      <span class="pill"><span id="opencode-dot" class="dot"></span><span id="opencode-label">OpenCode …</span></span>
+      <span class="pill reprobe" id="opencode-pill" title="click to re-probe OpenCode"><span id="opencode-dot" class="dot"></span><span id="opencode-label">OpenCode …</span></span>
       <span class="pill"><span id="provider-dot" class="dot"></span><span id="provider-label">provider none</span></span>
-      <span class="pill"><span id="agent-dot" class="dot"></span><span id="agent-label">agent —</span></span>
-      <span class="pill"><span id="model-dot" class="dot"></span><span id="model-label">model —</span></span>
+      <span class="pill"><span id="agent-dot" class="dot"></span><span id="agent-label">agent -</span></span>
+      <span class="pill"><span id="model-dot" class="dot"></span><span id="model-label">model -</span></span>
       <span class="pill"><span id="thinking-dot" class="dot"></span><span id="thinking-label">thinking idle</span></span>
       <span class="pill"><span id="gate-dot" class="dot"></span><span id="gate-label">gate off</span></span>
       <span class="pill"><span id="session-dot" class="dot ok"></span><span id="session-label">session 1</span></span>
@@ -335,7 +344,7 @@
       }
       const active = activeSession();
       const idx = sessions.findIndex((s) => s.id === activeSessionId) + 1;
-      sessionLabel.textContent = active ? `session ${idx}/${sessions.length}` : "session —";
+      sessionLabel.textContent = active ? `session ${idx}/${sessions.length}` : "session -";
       sessionDot.className = "dot ok";
     }
     function createSession(opts = {}) {
@@ -406,7 +415,7 @@
     function setAgentStatus(name) {
       if (!name) {
         agentDot.className = "dot";
-        agentLabel.textContent = "agent —";
+        agentLabel.textContent = "agent -";
         return;
       }
       agentDot.className = "dot ok";
@@ -416,7 +425,7 @@
       activeModel = name;
       if (!name) {
         modelDot.className = "dot";
-        modelLabel.textContent = "model —";
+        modelLabel.textContent = "model -";
         return;
       }
       modelDot.className = "dot ok";
@@ -680,6 +689,9 @@
         e.preventDefault();
         gateUnlockBtn.click();
       }
+    });
+    document.getElementById("opencode-pill").addEventListener("click", () => {
+      probeOpenCode({ quiet: false });
     });
     ensureSession();
     if (!activeSession().lines.length) {
