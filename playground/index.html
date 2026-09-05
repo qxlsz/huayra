@@ -220,7 +220,7 @@
       <span class="credit">Credit: <a href="https://x.com/zanneth" target="_blank" rel="noopener">Charles @zanneth</a> · MIT</span>
     </header>
     <div class="status-row" aria-label="Status">
-      <span class="pill reprobe" id="opencode-pill" title="click to re-probe OpenCode"><span id="opencode-dot" class="dot"></span><span id="opencode-label">OpenCode …</span></span>
+      <span class="pill reprobe" id="opencode-pill" title="click to re-probe OpenCode · shift+click to set URL"><span id="opencode-dot" class="dot"></span><span id="opencode-label">OpenCode …</span></span>
       <span class="pill"><span id="provider-dot" class="dot"></span><span id="provider-label">provider none</span></span>
       <span class="pill"><span id="agent-dot" class="dot"></span><span id="agent-label">agent -</span></span>
       <span class="pill"><span id="model-dot" class="dot"></span><span id="model-label">model -</span></span>
@@ -278,12 +278,24 @@
     const gateOverlay = document.getElementById("gate");
     const phraseInput = document.getElementById("phrase");
 
+    const OPENCODE_STORE_KEY = "huayra.playground.opencodeUrl.v1";
     function resolveOpenCodeUrl() {
       try {
         const q = new URLSearchParams(location.search).get("opencode");
         if (q && /^https?:\/\//i.test(q)) return q.replace(/\/$/, "");
       } catch {}
+      try {
+        const stored = localStorage.getItem(OPENCODE_STORE_KEY);
+        if (stored && /^https?:\/\//i.test(stored)) return stored.replace(/\/$/, "");
+      } catch {}
       return "http://127.0.0.1:4096";
+    }
+    function setOpenCodeUrl(url) {
+      const cleaned = String(url || "").trim().replace(/\/$/, "");
+      if (!/^https?:\/\//i.test(cleaned)) return false;
+      opencodeUrl = cleaned;
+      try { localStorage.setItem(OPENCODE_STORE_KEY, cleaned); } catch {}
+      return true;
     }
     function resolveGateConfig() {
       try {
@@ -714,7 +726,18 @@
         gateUnlockBtn.click();
       }
     });
-    document.getElementById("opencode-pill").addEventListener("click", () => {
+    document.getElementById("opencode-pill").addEventListener("click", (e) => {
+      if (e.shiftKey || e.altKey) {
+        const next = window.prompt("OpenCode base URL", opencodeUrl);
+        if (next == null) return;
+        if (!setOpenCodeUrl(next)) {
+          line("err", "invalid OpenCode URL (need http(s)://…)");
+          return;
+        }
+        opencodeReachable = false;
+        setOpenCodeStatus("warn", "OpenCode reconfig " + opencodeUrl);
+        line("sys", "OpenCode URL set to " + opencodeUrl);
+      }
       probeOpenCode({ quiet: false });
     });
     ensureSession();
