@@ -115,6 +115,7 @@
       border-color: var(--accent);
     }
     #session-new,
+    #session-sync,
     #session-clear {
       flex-shrink: 0;
       font: inherit;
@@ -236,6 +237,7 @@
       <span class="label">sessions</span>
       <div id="session-list"></div>
       <button type="button" id="session-new">+ new</button>
+      <button type="button" id="session-sync" title="import OpenCode remote sessions into index">sync</button>
       <button type="button" id="session-clear" title="clear active session log">clear</button>
     </div>
     <div id="log" role="log" aria-live="polite"></div>
@@ -257,6 +259,7 @@
       </div>
     </div>
   </div>
+  <script src="./session-sync.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
