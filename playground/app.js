@@ -1,1 +1,1 @@
-    const SESSION_STORE_KEY = "huayra.playground.sessions.v1";
+PLACEHOLDER_WILL_FAIL
