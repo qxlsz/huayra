@@ -1,0 +1,2 @@
+window.__HUAYRA_APP_PARTS = window.__HUAYRA_APP_PARTS || [];
+window.__HUAYRA_APP_PARTS[0] = `PLACEHOLDER`;
