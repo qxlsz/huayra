@@ -1,3 +1,1 @@
-    const SESSION_STORE_KEY = "huayra.playground.sessions.v1";
-    const logEl = document.getElementById("log");
-    // see local workspace for full file - restoring
+RECOVERY_NEEDED_SEE_LOCAL
