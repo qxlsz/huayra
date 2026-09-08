@@ -293,29 +293,63 @@ async function countRemoteSessions() {
     return null;
   }
 }
-async function probeOpenCode(opts = {}) {
-  const quiet = !!opts.quiet;
-  let ver = null;
-  let attached = false;
+function sameOriginMockUrl() {
+  try {
+    return location.origin + "/__opencode";
+  } catch {
+    return null;
+  }
+}
 
-  // Prefer /global/health, then /health, then root.
+function isDefaultOpenCodeTarget(url) {
+  return !url || url === "http://127.0.0.1:4096" || url === "http://localhost:4096";
+}
+
+async function tryAttachAt(base) {
+  let ver = null;
   for (const path of ["/global/health", "/health"]) {
-    if (attached) break;
     try {
-      const health = await fetchWithTimeout(opencodeUrl + path, { method: "GET", mode: "cors" }, 1200);
+      const health = await fetchWithTimeout(base + path, { method: "GET", mode: "cors" }, 1200);
       if (health.ok) {
         const body = await health.json().catch(() => null);
         ver = body?.version || body?.ver || null;
-        attached = true;
+        return { ok: true, ver };
       }
     } catch {}
   }
+  try {
+    const res = await fetchWithTimeout(base + "/", { method: "GET", mode: "cors" }, 1200);
+    if (res.ok) return { ok: true, ver: null };
+  } catch {}
+  return { ok: false, ver: null };
+}
 
-  if (!attached) {
-    try {
-      const res = await fetchWithTimeout(opencodeUrl + "/", { method: "GET", mode: "cors" }, 1200);
-      if (res.ok) attached = true;
-    } catch {}
+async function probeOpenCode(opts = {}) {
+  const quiet = !!opts.quiet;
+  let attached = false;
+  let ver = null;
+  let usedMockFallback = false;
+
+  const primary = await tryAttachAt(opencodeUrl);
+  if (primary.ok) {
+    attached = true;
+    ver = primary.ver;
+  }
+
+  // When the configured target is the default local OpenCode port and it is
+  // offline, auto-attach the same-origin preview mock so npm run dev works
+  // end-to-end without a manual shift+click URL change.
+  if (!attached && isDefaultOpenCodeTarget(opencodeUrl)) {
+    const mockUrl = sameOriginMockUrl();
+    if (mockUrl && mockUrl !== opencodeUrl) {
+      const mock = await tryAttachAt(mockUrl);
+      if (mock.ok) {
+        opencodeUrl = mockUrl;
+        attached = true;
+        ver = mock.ver;
+        usedMockFallback = true;
+      }
+    }
   }
 
   if (!attached) {
@@ -328,12 +362,10 @@ async function probeOpenCode(opts = {}) {
     setOpenCodeStatus("err", "OpenCode offline");
     if (!quiet) {
       line("sys", "OpenCode not reachable at " + opencodeUrl);
-      try {
-        const mockHint = location.origin + "/__opencode";
-        if (opencodeUrl !== mockHint) {
-          line("sys", "tip: shift+click OpenCode pill and set URL to " + mockHint + " for local mock");
-        }
-      } catch {}
+      const mockHint = sameOriginMockUrl();
+      if (mockHint && opencodeUrl !== mockHint) {
+        line("sys", "tip: shift+click OpenCode pill and set URL to " + mockHint + " for local mock");
+      }
     }
     startProbeTimer();
     return false;
@@ -352,8 +384,15 @@ async function probeOpenCode(opts = {}) {
   const remoteBit = remoteCount != null ? ` · ${remoteCount} remote` : "";
   const agentBit = agentName ? ` · agent ${agentName}` : "";
   setOpenCodeStatus("ok", "OpenCode" + verBit);
-  if (!quiet) line("sys", `attached OpenCode at ${opencodeUrl}` + verBit + (model ? ` · ${model}` : "") + agentBit + remoteBit);
-  else line("sys", `OpenCode became reachable · ${opencodeUrl}` + verBit + (model ? ` · ${model}` : "") + agentBit + remoteBit);
+  if (!quiet) {
+    if (usedMockFallback) {
+      line("sys", "OpenCode default offline; attached preview mock at " + opencodeUrl + verBit + (model ? ` · ${model}` : "") + agentBit + remoteBit);
+    } else {
+      line("sys", `attached OpenCode at ${opencodeUrl}` + verBit + (model ? ` · ${model}` : "") + agentBit + remoteBit);
+    }
+  } else {
+    line("sys", `OpenCode became reachable · ${opencodeUrl}` + verBit + (model ? ` · ${model}` : "") + agentBit + remoteBit);
+  }
   startProbeTimer();
   return true;
 }
