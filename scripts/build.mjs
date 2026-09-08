@@ -11,7 +11,8 @@ await copyFile(join(playground, "index.html"), join(dist, "index.html"));
 await copyFile(join(playground, "app.js"), join(dist, "app.js"));
 await copyFile(join(playground, "session-sync.js"), join(dist, "session-sync.js"));
 for (const name of await readdir(playground)) {
-  if (/^app-part-\d+\.js$/.test(name)) {
+  if (name === "index.html" || name === "app.js" || name === "session-sync.js") continue;
+  if (name.endsWith(".js") || name.endsWith(".css") || name.endsWith(".svg")) {
     await copyFile(join(playground, name), join(dist, name));
   }
 }
