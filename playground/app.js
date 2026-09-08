@@ -52,13 +52,15 @@ let provider = "none";
 let probeTimer = null;
 let abortCtrl = null;
 
-function line(cls, text) {
+function line(cls, text, opts) {
   if (!logEl) return;
+  const persist = !opts || opts.persist !== false;
   const el = document.createElement("div");
   el.className = "line " + (cls || "");
   el.textContent = text;
   logEl.appendChild(el);
   logEl.scrollTop = logEl.scrollHeight;
+  if (!persist) return;
   const s = sessions.find((x) => x.id === activeSessionId);
   if (s) {
     s.lines.push({ cls, text });
@@ -186,7 +188,7 @@ function createSession(title) {
   return s;
 }
 function switchSession(id) {
-  if (id === activeSessionId) return;
+  if (!sessions.some((x) => x.id === id)) return;
   activeSessionId = id;
   persistSessions();
   renderSessionBar();
@@ -202,52 +204,44 @@ function clearActiveSession() {
   line("sys", "session cleared");
 }
 async function syncRemoteSessions() {
-  if (!opencodeReachable || !window.HuayraSessionSync) {
+  if (!opencodeReachable) {
     line("sys", "OpenCode offline; cannot sync remote sessions");
     return;
   }
   line("sys", "syncing remote sessions…");
   try {
-    const remote = await window.HuayraSessionSync.listRemoteSessions(opencodeUrl, fetchWithTimeout);
-    if (!remote || !remote.length) {
+    const list = await window.HuayraSessionSync.listRemoteSessions(opencodeUrl, fetchWithTimeout);
+    if (!list || !list.length) {
       line("sys", "no remote sessions");
       return;
     }
     let imported = 0;
-    for (const r of remote) {
+    for (const r of list) {
       if (sessions.some((s) => s.remoteSessionId === r.id)) continue;
-      const title = r.title || ("remote " + String(r.id).slice(0, 8));
-      const s = createSession(title);
-      s.remoteSessionId = r.id;
       const msgs = await window.HuayraSessionSync.fetchRemoteMessages(opencodeUrl, r.id, fetchWithTimeout);
-      for (const m of msgs) s.lines.push(m);
+      const s = {
+        id: "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        title: r.title || null,
+        lines: msgs || [],
+        remoteSessionId: r.id,
+      };
+      sessions.push(s);
       imported++;
     }
     persistSessions();
     renderSessionBar();
-    renderActiveLines();
     line("sys", "synced " + imported + " remote session(s)");
   } catch (e) {
     line("err", "sync failed: " + (e && e.message ? e.message : e));
   }
 }
 
-const gateConfig = (function () {
-  const params = new URLSearchParams(location.search);
-  const requireGate = params.get("gate") === "1" || !!params.get("gate_hash");
-  const gateHash = params.get("gate_hash") || null;
-  return { requireGate, gateHash, unlocked: !requireGate };
-})();
-
-async function fetchWithTimeout(url, opts, ms) {
+function fetchWithTimeout(url, opts, ms) {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), ms);
-  try {
-    return await fetch(url, { ...opts, signal: ctrl.signal });
-  } finally {
-    clearTimeout(t);
-  }
+  const t = setTimeout(() => ctrl.abort(), ms || 2000);
+  return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(t));
 }
+
 async function resolveOpenCodeModel() {
   try {
     const res = await fetchWithTimeout(opencodeUrl + "/v1/models", { method: "GET", mode: "cors" }, 1500);
@@ -361,10 +355,10 @@ async function probeOpenCode(opts = {}) {
     setAgentStatus(null);
     setOpenCodeStatus("err", "OpenCode offline");
     if (!quiet) {
-      line("sys", "OpenCode not reachable at " + opencodeUrl);
+      line("sys", "OpenCode not reachable at " + opencodeUrl, { persist: false });
       const mockHint = sameOriginMockUrl();
       if (mockHint && opencodeUrl !== mockHint) {
-        line("sys", "tip: shift+click OpenCode pill and set URL to " + mockHint + " for local mock");
+        line("sys", "tip: shift+click OpenCode pill and set URL to " + mockHint + " for local mock", { persist: false });
       }
     }
     startProbeTimer();
@@ -386,12 +380,12 @@ async function probeOpenCode(opts = {}) {
   setOpenCodeStatus("ok", "OpenCode" + verBit);
   if (!quiet) {
     if (usedMockFallback) {
-      line("sys", "OpenCode default offline; attached preview mock at " + opencodeUrl + verBit + (model ? ` · ${model}` : "") + agentBit + remoteBit);
+      line("sys", "OpenCode default offline; attached preview mock at " + opencodeUrl + verBit + (model ? ` · ${model}` : "") + agentBit + remoteBit, { persist: false });
     } else {
-      line("sys", `attached OpenCode at ${opencodeUrl}` + verBit + (model ? ` · ${model}` : "") + agentBit + remoteBit);
+      line("sys", `attached OpenCode at ${opencodeUrl}` + verBit + (model ? ` · ${model}` : "") + agentBit + remoteBit, { persist: false });
     }
   } else {
-    line("sys", `OpenCode became reachable · ${opencodeUrl}` + verBit + (model ? ` · ${model}` : "") + agentBit + remoteBit);
+    line("sys", `OpenCode became reachable · ${opencodeUrl}` + verBit + (model ? ` · ${model}` : "") + agentBit + remoteBit, { persist: false });
   }
   startProbeTimer();
   return true;
@@ -418,7 +412,7 @@ async function tryUnlockGate() {
     try {
       const enc = new TextEncoder().encode(phrase);
       const buf = await crypto.subtle.digest("SHA-256", enc);
-      const hex = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+      const hex = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
       if (hex.toLowerCase() === gateConfig.gateHash.toLowerCase()) {
         setGateStatus(true);
         line("sys", "gate unlocked");
@@ -431,6 +425,13 @@ async function tryUnlockGate() {
   setGateStatus(true);
   line("sys", "gate unlocked");
 }
+
+const gateConfig = (function () {
+  const params = new URLSearchParams(location.search);
+  const requireGate = params.get("gate") === "1" || !!params.get("gate_hash");
+  const gateHash = params.get("gate_hash") || null;
+  return { requireGate, gateHash, unlocked: !requireGate };
+})();
 
 async function ensureRemoteSession() {
   const s = sessions.find((x) => x.id === activeSessionId);
@@ -445,7 +446,7 @@ async function ensureRemoteSession() {
     });
     if (!res.ok) return null;
     const data = await res.json();
-    const rid = data?.id || data?.sessionID || data?.sessionId || null;
+    const rid = data?.id || data?.sessionID || data?.sessionId;
     if (rid) {
       s.remoteSessionId = rid;
       persistSessions();
@@ -642,11 +643,11 @@ ensureSession();
 stopBtn.disabled = true;
 if (gateConfig.requireGate) {
   setGateStatus(false);
-  line("sys", "host gate required (?gate=1 or gate_hash)");
+  line("sys", "host gate required (?gate=1 or gate_hash)", { persist: false });
 } else {
   setGateStatus(true);
 }
-line("sys", "Huayra playground · credit @zanneth · OpenCode target " + opencodeUrl);
+line("sys", "Huayra playground · credit @zanneth · OpenCode target " + opencodeUrl, { persist: false });
 probeOpenCode({ quiet: false });
 try { promptEl.focus(); } catch {}
 
