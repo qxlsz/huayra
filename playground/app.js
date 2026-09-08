@@ -48,3 +48,21 @@ function setOpenCodeUrl(url) {
 }
 let opencodeUrl = resolveOpenCodeUrl();
 let opencodeReachable = false;
+let provider = "none";
+let probeTimer = null;
+let abortCtrl = null;
+
+function line(cls, text, opts = {}) {
+  if (!logEl) return;
+  const el = document.createElement("div");
+  el.className = "line " + (cls || "");
+  el.textContent = text;
+  logEl.appendChild(el);
+  logEl.scrollTop = logEl.scrollHeight;
+  if (opts.persist === false) return;
+  const s = sessions.find((x) => x.id === activeSessionId);
+  if (s) {
+    s.lines.push({ cls, text });
+    persistSessions();
+  }
+}
