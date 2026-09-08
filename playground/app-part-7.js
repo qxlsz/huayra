@@ -1,2 +1,0 @@
-window.__HUAYRA_APP_PARTS = window.__HUAYRA_APP_PARTS || [];
-window.__HUAYRA_APP_PARTS[7] = 'PLACEHOLDER_PART7';
