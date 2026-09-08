@@ -143,14 +143,32 @@ function renderActiveLines() {
   }
   logEl.scrollTop = logEl.scrollHeight;
 }
+function renameSession(id) {
+  const s = sessions.find((x) => x.id === id);
+  if (!s) return;
+  const current = s.title || "";
+  const next = window.prompt("Rename session", current);
+  if (next == null) return;
+  const cleaned = String(next).trim();
+  s.title = cleaned || null;
+  persistSessions();
+  renderSessionBar();
+}
 function renderSessionBar() {
   sessionListEl.replaceChildren();
   sessions.forEach((s, i) => {
     const btn = document.createElement("button");
     btn.type = "button";
+    btn.className = "session-chip";
     btn.textContent = s.title || ("session " + (i + 1));
+    btn.title = "click to switch · double-click to rename";
     if (s.id === activeSessionId) btn.classList.add("active");
     btn.addEventListener("click", () => switchSession(s.id));
+    btn.addEventListener("dblclick", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      renameSession(s.id);
+    });
     sessionListEl.appendChild(btn);
   });
   const idx = sessions.findIndex((s) => s.id === activeSessionId);
@@ -503,7 +521,7 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
-stopBtn.addEventListener("click", () => {
+function abortInFlight() {
   if (abortCtrl) abortCtrl.abort();
   const s = sessions.find((x) => x.id === activeSessionId);
   const rid = s?.remoteSessionId;
@@ -514,6 +532,15 @@ stopBtn.addEventListener("click", () => {
     }).catch(() => {});
   }
   setThinking(false);
+}
+stopBtn.addEventListener("click", () => abortInFlight());
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    if (abortCtrl) {
+      e.preventDefault();
+      abortInFlight();
+    }
+  }
 });
 
 sessionNewBtn.addEventListener("click", () => {
@@ -571,5 +598,6 @@ if (gateConfig.requireGate) {
 }
 line("sys", "Huayra playground · credit @zanneth · OpenCode target " + opencodeUrl);
 probeOpenCode({ quiet: false });
+try { promptEl.focus(); } catch {}
 
 })();
