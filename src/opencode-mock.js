@@ -65,7 +65,12 @@ export function createOpenCodeMock() {
     }
 
     if (path === "/agent" && method === "GET") {
-      json(res, 200, { name: "build", id: "build" });
+      json(res, 200, {
+        name: "build",
+        id: "build",
+        model: "mock-model",
+        provider: "opencode-mock",
+      });
       return true;
     }
 
