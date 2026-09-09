@@ -48,7 +48,8 @@ export function createOpenCodeMock() {
     }
 
     if ((path === "/global/health" || path === "/health") && method === "GET") {
-      json(res, 200, { ok: true, version: "mock-1.0.0" });
+      // Match upstream OpenCode shape ({ healthy, version }) and keep ok for older clients.
+      json(res, 200, { healthy: true, ok: true, version: "mock-1.0.0" });
       return true;
     }
 
@@ -97,79 +98,3 @@ export function createOpenCodeMock() {
       });
       return true;
     }
-
-    const msgMatch = path.match(/^\/session\/([^/]+)\/message$/);
-    if (msgMatch && method === "GET") {
-      const s = sessions.get(decodeURIComponent(msgMatch[1]));
-      if (!s) {
-        json(res, 404, { error: "session not found" });
-        return true;
-      }
-      json(
-        res,
-        200,
-        s.messages.map((m) => ({
-          role: m.role,
-          parts: [{ type: "text", text: m.text }],
-        })),
-      );
-      return true;
-    }
-
-    const promptMatch = path.match(/^\/session\/([^/]+)\/prompt$/);
-    const messagePostMatch = path.match(/^\/session\/([^/]+)\/message$/);
-    if ((promptMatch || messagePostMatch) && method === "POST") {
-      const sid = decodeURIComponent((promptMatch || messagePostMatch)[1]);
-      let s = sessions.get(sid);
-      if (!s) {
-        s = { id: sid, title: "huayra", messages: [] };
-        sessions.set(sid, s);
-      }
-      let body = "";
-      req.on("data", (c) => {
-        body += c;
-      });
-      req.on("end", () => {
-        let userText = "";
-        try {
-          const parsed = JSON.parse(body || "{}");
-          if (Array.isArray(parsed?.parts)) {
-            userText = parsed.parts.map((p) => p?.text || "").filter(Boolean).join("\n");
-          } else if (typeof parsed?.content === "string") {
-            userText = parsed.content;
-          } else if (typeof parsed?.text === "string") {
-            userText = parsed.text;
-          }
-        } catch {}
-        userText = String(userText || "").trim() || "(empty)";
-        s.messages.push({ role: "user", text: userText });
-        const reply = `mock reply: ${userText.slice(0, 200)}`;
-        s.messages.push({ role: "assistant", text: reply });
-
-        res.writeHead(200, {
-          "content-type": "text/event-stream; charset=utf-8",
-          "access-control-allow-origin": "*",
-          "cache-control": "no-cache",
-          connection: "keep-alive",
-        });
-        res.write(`data: ${JSON.stringify({ text: reply })}\n\n`);
-        res.write("data: [DONE]\n\n");
-        res.end();
-      });
-      return true;
-    }
-
-    const abortMatch = path.match(/^\/session\/([^/]+)\/abort$/);
-    if (abortMatch && method === "POST") {
-      json(res, 200, { ok: true });
-      return true;
-    }
-
-    return false;
-  }
-
-  return { handle, sessions };
-}
-
-/** Mount path prefix used by preview (no trailing slash). */
-export const OPENCODE_MOCK_PREFIX = "/__opencode";
