@@ -83,11 +83,37 @@ test("preview mounts OpenCode mock under /__opencode", async (t) => {
   t.after(() => {
     preview.kill("SIGTERM");
   });
-  await waitForOutput(preview, "huayra preview");
+  await waitForOutput(preview, `http://127.0.0.1:${port}`);
 
   const health = await fetch(`http://127.0.0.1:${port}${OPENCODE_MOCK_PREFIX}/global/health`);
   assert.equal(health.status, 200);
-  const body = await health.json();
-  assert.equal(body.ok, true);
-  assert.match(String(body.version || ""), /mock/);
+  const h = await health.json();
+  assert.equal(h.ok, true);
+
+  const models = await fetch(`http://127.0.0.1:${port}${OPENCODE_MOCK_PREFIX}/v1/models`);
+  assert.equal(models.status, 200);
+  const m = await models.json();
+  assert.ok(Array.isArray(m.data) && m.data.length);
+
+  const create = await fetch(`http://127.0.0.1:${port}${OPENCODE_MOCK_PREFIX}/session`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ title: "t" }),
+  });
+  assert.equal(create.status, 200);
+  const sess = await create.json();
+  assert.ok(sess.id);
+
+  const prompt = await fetch(
+    `http://127.0.0.1:${port}${OPENCODE_MOCK_PREFIX}/session/${encodeURIComponent(sess.id)}/prompt`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "text/event-stream" },
+      body: JSON.stringify({ parts: [{ type: "text", text: "hello mock" }] }),
+    },
+  );
+  assert.equal(prompt.status, 200);
+  const streamText = await prompt.text();
+  assert.match(streamText, /mock reply/);
+  assert.match(streamText, /hello mock/);
 });
