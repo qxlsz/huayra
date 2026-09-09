@@ -98,7 +98,7 @@ function setThinking(on) {
     sendBtn.disabled = true;
   } else {
     thinkingDot.className = "dot";
-    thinkingLabel.textContent = "thinking -";
+    thinkingLabel.textContent = "thinking idle";
     stopBtn.classList.remove("visible");
     stopBtn.disabled = true;
     sendBtn.disabled = false;
@@ -435,16 +435,72 @@ async function ensureRemoteSession() {
   }
 }
 
+function appendAssistantChunk(text) {
+  if (!logEl || !text) return null;
+  const last = logEl.lastElementChild;
+  if (last && last.classList.contains("assistant") && last.dataset.streaming === "1") {
+    last.textContent += text;
+    logEl.scrollTop = logEl.scrollHeight;
+    const s = sessions.find((x) => x.id === activeSessionId);
+    if (s && s.lines && s.lines.length) {
+      const row = s.lines[s.lines.length - 1];
+      if (row && row.cls === "assistant") {
+        row.text = last.textContent;
+        persistSessions();
+      }
+    }
+    return last;
+  }
+  const el = document.createElement("div");
+  el.className = "line assistant";
+  el.dataset.streaming = "1";
+  el.textContent = text;
+  logEl.appendChild(el);
+  logEl.scrollTop = logEl.scrollHeight;
+  const s = sessions.find((x) => x.id === activeSessionId);
+  if (s) {
+    s.lines.push({ cls: "assistant", text });
+    persistSessions();
+  }
+  return el;
+}
+
+function finishAssistantStream() {
+  if (!logEl) return;
+  const last = logEl.lastElementChild;
+  if (last && last.dataset.streaming === "1") delete last.dataset.streaming;
+}
+
+async function postSessionMessage(rid, text) {
+  const paths = [
+    "/session/" + encodeURIComponent(rid) + "/message",
+    "/session/" + encodeURIComponent(rid) + "/prompt",
+  ];
+  let lastErr = null;
+  for (const path of paths) {
+    try {
+      const res = await fetch(opencodeUrl + path, {
+        method: "POST",
+        mode: "cors",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ content: text, role: "user", parts: [{ type: "text", text }] }),
+        signal: abortCtrl.signal,
+      });
+      if (res.ok) return res;
+      lastErr = new Error("HTTP " + res.status + " on " + path);
+      if (res.status !== 404 && res.status !== 405) throw lastErr;
+    } catch (err) {
+      if (err && err.name === "AbortError") throw err;
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error("no message endpoint");
+}
+
 async function streamReply(rid, text) {
   abortCtrl = new AbortController();
   try {
-    const res = await fetch(opencodeUrl + "/session/" + encodeURIComponent(rid) + "/message", {
-      method: "POST",
-      mode: "cors",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ content: text, role: "user" }),
-      signal: abortCtrl.signal,
-    });
+    const res = await postSessionMessage(rid, text);
     if (!res.ok) {
       line("err", "message failed: HTTP " + res.status);
       return false;
@@ -476,17 +532,18 @@ async function streamReply(rid, text) {
               (obj.message && (obj.message.content || obj.message.text)) ||
               null;
             if (chunk) {
-              line("assistant", String(chunk));
+              appendAssistantChunk(String(chunk));
               got = true;
             }
           } catch {
             if (payload) {
-              line("assistant", payload);
+              appendAssistantChunk(payload);
               got = true;
             }
           }
         }
       }
+      finishAssistantStream();
       if (got) return true;
     } else {
       const data = await res.json().catch(() => null);
@@ -503,6 +560,7 @@ async function streamReply(rid, text) {
     }
   } catch (err) {
     if (err && err.name === "AbortError") {
+      finishAssistantStream();
       line("sys", "aborted");
       return false;
     }
@@ -654,6 +712,10 @@ async function tryUnlockGate() {
 }
 if (gateSkip) {
   gateSkip.addEventListener("click", () => {
+    if (gateConfig.gateHash) {
+      line("err", "gate skip disabled when gate_hash is set");
+      return;
+    }
     setGateStatus(true);
     line("sys", "gate skipped");
   });
@@ -673,8 +735,13 @@ if (phraseInput) {
 // Boot: paint sessions and status immediately, gate does not block first paint
 ensureSession();
 stopBtn.disabled = true;
+setThinking(false);
 if (gateConfig.requireGate) {
   setGateStatus(false);
+  if (gateConfig.gateHash && gateSkip) {
+    gateSkip.disabled = true;
+    gateSkip.title = "skip disabled when gate_hash is set";
+  }
   line("sys", "host gate required (?gate=1 or gate_hash)", { persist: false });
 } else {
   setGateStatus(true);
