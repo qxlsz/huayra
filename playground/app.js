@@ -214,43 +214,85 @@ function clearActiveSession() {
   line("sys", "session cleared");
 }
 
+function fetchWithTimeout(url, opts, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms || 2000);
+  const merged = Object.assign({}, opts || {}, { signal: ctrl.signal });
+  return fetch(url, merged).finally(() => clearTimeout(t));
+}
+
 async function syncRemoteSessions() {
   if (!opencodeReachable) {
     line("sys", "OpenCode offline, cannot sync");
     return;
   }
   try {
-    const res = await fetch(opencodeUrl + "/session", { mode: "cors" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    const list = Array.isArray(data) ? data : data.sessions || data.items || [];
+    let list = null;
+    if (window.HuayraSessionSync && typeof window.HuayraSessionSync.listRemoteSessions === "function") {
+      list = await window.HuayraSessionSync.listRemoteSessions(opencodeUrl, fetchWithTimeout);
+    }
+    if (!list) {
+      const res = await fetch(opencodeUrl + "/session", { mode: "cors" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      list = Array.isArray(data) ? data : data.sessions || data.items || [];
+    }
     let imported = 0;
+    let hydrated = 0;
     for (const remote of list) {
       const rid = remote && (remote.id || remote.sessionId || remote.session_id);
       if (!rid) continue;
       const title = (remote.title || remote.name || String(rid).slice(0, 8)).trim();
-      const existing = sessions.find((s) => s.remoteSessionId === rid);
-      if (existing) {
-        if (title && existing.title !== title) {
-          existing.title = title;
-        }
-        continue;
+      let target = sessions.find((s) => s.remoteSessionId === rid);
+      if (!target) {
+        const id = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        target = {
+          id,
+          title,
+          lines: [],
+          remoteSessionId: rid,
+        };
+        sessions.push(target);
+        imported += 1;
+      } else if (title && target.title !== title) {
+        target.title = title;
       }
-      const id = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      sessions.push({
-        id,
-        title,
-        lines: [],
-        remoteSessionId: rid,
-      });
-      imported += 1;
+      if (
+        (!target.lines || target.lines.length === 0) &&
+        window.HuayraSessionSync &&
+        typeof window.HuayraSessionSync.fetchRemoteMessages === "function"
+      ) {
+        const msgs = await window.HuayraSessionSync.fetchRemoteMessages(
+          opencodeUrl,
+          rid,
+          fetchWithTimeout,
+        );
+        if (msgs && msgs.length) {
+          target.lines = msgs;
+          hydrated += 1;
+        }
+      }
     }
     persistSessions();
     renderSessionBar();
+    if (activeSessionId) {
+      const active = sessions.find((s) => s.id === activeSessionId);
+      if (active && active.lines && active.lines.length && logEl && logEl.children.length === 0) {
+        for (const row of active.lines) {
+          const el = document.createElement("div");
+          el.className = "line " + (row.cls || "");
+          el.textContent = row.text;
+          logEl.appendChild(el);
+        }
+      }
+    }
+    const parts = [];
+    if (imported) parts.push("imported " + imported);
+    if (hydrated) parts.push("hydrated " + hydrated + " history");
     line(
       "sys",
-      imported
-        ? "session index: imported " + imported + " of " + list.length + " remote"
+      parts.length
+        ? "session index: " + parts.join(", ") + " of " + list.length + " remote"
         : "session index: " + list.length + " remote, none new",
       { persist: false },
     );
@@ -268,14 +310,26 @@ function sameOriginMockUrl() {
 }
 
 async function tryAttachAt(base) {
-  try {
-    const res = await fetch(base + "/health", { mode: "cors", signal: AbortSignal.timeout(2500) });
-    if (!res.ok) return { ok: false };
-    const data = await res.json().catch(() => ({}));
-    return { ok: true, ver: data.version || data.service || "ok", data };
-  } catch {
-    return { ok: false };
+  // Real OpenCode serve exposes /global/health; mock and older clients also answer /health.
+  const paths = ["/global/health", "/health"];
+  for (const path of paths) {
+    try {
+      const res = await fetch(base + path, { mode: "cors", signal: AbortSignal.timeout(2500) });
+      if (!res.ok) continue;
+      const data = await res.json().catch(() => ({}));
+      if (data && (data.healthy === true || data.ok === true || data.version || data.service)) {
+        return {
+          ok: true,
+          ver: data.version || data.service || "ok",
+          data,
+          path,
+        };
+      }
+    } catch {
+      /* try next path */
+    }
   }
+  return { ok: false };
 }
 
 async function resolveAgentAndModel() {
