@@ -250,19 +250,39 @@ async function tryAttachAt(base) {
 }
 
 async function resolveAgentAndModel() {
+  let model = null;
   try {
     const res = await fetch(opencodeUrl + "/agent", { mode: "cors", signal: AbortSignal.timeout(2500) });
-    if (!res.ok) return;
-    const data = await res.json().catch(() => ({}));
-    const agent = data.name || data.agent || data.id || null;
-    const model = data.model || data.modelId || null;
-    if (agent) setAgentStatus(agent);
-    if (model) setModelStatus(model);
-    if (data.provider) {
-      provider = String(data.provider);
-      setProviderStatus(provider);
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const agent = data.name || data.agent || data.id || null;
+      model = data.model || data.modelId || null;
+      if (agent) setAgentStatus(agent);
+      if (model) setModelStatus(model);
+      if (data.provider) {
+        provider = String(data.provider);
+        setProviderStatus(provider);
+      }
     }
   } catch {}
+  if (!model) {
+    try {
+      const res = await fetch(opencodeUrl + "/v1/models", { mode: "cors", signal: AbortSignal.timeout(2500) });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+        const first = list[0];
+        const id = first && (first.id || first.model || first.name);
+        if (id) {
+          setModelStatus(String(id));
+          if (!provider || provider === "none") {
+            provider = "opencode";
+            setProviderStatus(provider);
+          }
+        }
+      }
+    } catch {}
+  }
 }
 
 async function probeOpenCode(opts) {
