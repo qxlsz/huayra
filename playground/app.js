@@ -224,7 +224,36 @@ async function syncRemoteSessions() {
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     const list = Array.isArray(data) ? data : data.sessions || data.items || [];
-    line("sys", "remote sessions: " + list.length, { persist: false });
+    let imported = 0;
+    for (const remote of list) {
+      const rid = remote && (remote.id || remote.sessionId || remote.session_id);
+      if (!rid) continue;
+      const title = (remote.title || remote.name || String(rid).slice(0, 8)).trim();
+      const existing = sessions.find((s) => s.remoteSessionId === rid);
+      if (existing) {
+        if (title && existing.title !== title) {
+          existing.title = title;
+        }
+        continue;
+      }
+      const id = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      sessions.push({
+        id,
+        title,
+        lines: [],
+        remoteSessionId: rid,
+      });
+      imported += 1;
+    }
+    persistSessions();
+    renderSessionBar();
+    line(
+      "sys",
+      imported
+        ? "session index: imported " + imported + " of " + list.length + " remote"
+        : "session index: " + list.length + " remote, none new",
+      { persist: false },
+    );
   } catch (err) {
     line("err", "session sync failed: " + (err && err.message ? err.message : err));
   }
