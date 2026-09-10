@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { join, extname } from "node:path";
 
@@ -39,6 +39,16 @@ for (const file of files.sort()) {
     failed += 1;
     process.stderr.write(result.stderr || `syntax error: ${file}\n`);
   }
+}
+
+const consoleSrc = await readFile(join("playground", "app.js"), "utf8");
+if (consoleSrc.includes("DecompressionStream") || consoleSrc.includes("(0, eval)")) {
+  failed += 1;
+  process.stderr.write("playground/app.js must stay plain JS (no gzip eval loader)\n");
+}
+if (!consoleSrc.includes("function probeOpenCode") || !consoleSrc.includes("SESSION_STORE_KEY")) {
+  failed += 1;
+  process.stderr.write("playground/app.js is truncated; expected a full prompt console\n");
 }
 
 if (failed > 0) {

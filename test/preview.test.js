@@ -67,4 +67,10 @@ test("preview serves the playground and blocks path traversal", async (t) => {
 
   const encoded = await fetch(`http://127.0.0.1:${port}/%2e%2e/package.json`);
   assert.equal(encoded.status, 404);
+
+  const app = await fetch(`http://127.0.0.1:${port}/app.js`);
+  assert.equal(app.status, 200);
+  const js = await app.text();
+  assert.match(js, /function probeOpenCode/);
+  assert.doesNotMatch(js, /DecompressionStream/);
 });
