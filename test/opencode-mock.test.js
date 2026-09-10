@@ -115,5 +115,19 @@ test("preview mounts OpenCode mock under /__opencode", async (t) => {
   assert.equal(prompt.status, 200);
   const streamText = await prompt.text();
   assert.match(streamText, /mock reply/);
-  assert.match(streamText, /hello mock/);
+  // Multi-chunk SSE: tokens may land on separate data lines; join payloads for the full reply.
+  const joined = streamText
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("data:") && !l.includes("[DONE]"))
+    .map((l) => {
+      try {
+        return JSON.parse(l.slice(5).trim()).text || "";
+      } catch {
+        return "";
+      }
+    })
+    .join("");
+  assert.match(joined, /hello mock/);
+  assert.ok((streamText.match(/^data:/gm) || []).length >= 3, "expected multi-chunk SSE");
 });
