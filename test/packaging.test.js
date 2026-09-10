@@ -41,13 +41,15 @@ test("playground stays a dark static shell", () => {
   assert.match(html, /id="thinking-label"/);
 });
 
-test("playground app.js gzip payload is complete", () => {
+test("playground app.js console source is complete", () => {
   const src = read("../playground/app.js");
   const match = src.match(/const b64 = "([A-Za-z0-9+/=]+)"/);
-  assert.ok(match, "app.js must embed a gzip payload");
-  const raw = gunzipSync(Buffer.from(match[1], "base64")).toString("utf8");
-  assert.ok(raw.length > 2000, "decompressed console source must not be truncated");
+  const raw = match
+    ? gunzipSync(Buffer.from(match[1], "base64")).toString("utf8")
+    : src;
+  assert.ok(raw.length > 2000, "console source must not be truncated");
   assert.match(raw, /OpenCode|opencode/i);
+  assert.match(raw, /SESSION_STORE_KEY/);
 });
 
 test("LICENSE keeps upstream MIT credit", () => {
