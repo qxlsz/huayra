@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { gunzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
@@ -32,6 +33,21 @@ test("playground stays a dark static shell", () => {
   assert.match(html, /<!doctype html>/i);
   assert.match(html, /lang="en"/);
   assert.match(html, /<title>Huayra playground<\/title>/);
+  assert.match(html, /id="guardian"/);
+  assert.match(html, /id="templar"/);
+  assert.match(html, /id="session-bar"/);
+  assert.match(html, /id="agent-label"/);
+  assert.match(html, /id="model-label"/);
+  assert.match(html, /id="thinking-label"/);
+});
+
+test("playground app.js gzip payload is complete", () => {
+  const src = read("../playground/app.js");
+  const match = src.match(/const b64 = "([A-Za-z0-9+/=]+)"/);
+  assert.ok(match, "app.js must embed a gzip payload");
+  const raw = gunzipSync(Buffer.from(match[1], "base64")).toString("utf8");
+  assert.ok(raw.length > 2000, "decompressed console source must not be truncated");
+  assert.match(raw, /OpenCode|opencode/i);
 });
 
 test("LICENSE keeps upstream MIT credit", () => {

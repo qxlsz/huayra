@@ -2,7 +2,7 @@ import { readdir } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { join, extname } from "node:path";
 
-const ROOTS = ["src", "test", "scripts", "packaging"];
+const ROOTS = ["src", "test", "scripts", "packaging", "playground"];
 const SKIP_DIRS = new Set(["node_modules", "dist"]);
 
 async function collect(dir, acc = []) {
