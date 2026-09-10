@@ -144,7 +144,10 @@ export function createOpenCodeMock() {
         } catch {}
         userText = String(userText || "").trim() || "(empty)";
         s.messages.push({ role: "user", text: userText });
-        const reply = `mock reply: ${userText.slice(0, 200)}`;
+        // Faithful console: multi-chunk SSE so the playground streams one assistant line.
+        // Keep a short "mock reply" marker for tests and local debugging.
+        const snippet = userText.slice(0, 200);
+        const reply = `mock reply: ${snippet}`;
         s.messages.push({ role: "assistant", text: reply });
 
         res.writeHead(200, {
@@ -153,7 +156,10 @@ export function createOpenCodeMock() {
           "cache-control": "no-cache",
           connection: "keep-alive",
         });
-        res.write(`data: ${JSON.stringify({ text: reply })}\n\n`);
+        const tokens = ["mock reply: ", ...snippet.split(/(\s+)/).filter((t) => t.length > 0)];
+        for (const token of tokens) {
+          res.write(`data: ${JSON.stringify({ text: token })}\n\n`);
+        }
         res.write("data: [DONE]\n\n");
         res.end();
       });
