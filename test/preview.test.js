@@ -54,6 +54,10 @@ test("preview serves the playground and blocks path traversal", async (t) => {
   assert.equal(page.status, 200);
   const html = await page.text();
   assert.match(html, /Huayra playground/);
+  assert.match(html, /id="guardian"/);
+  assert.match(html, /id="templar"/);
+  assert.match(html, /id="session-bar"/);
+  assert.match(html, /id="agent-label"/);
 
   const missing = await fetch(`http://127.0.0.1:${port}/nope.html`);
   assert.equal(missing.status, 404);
