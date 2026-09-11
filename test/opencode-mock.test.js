@@ -56,6 +56,19 @@ test("opencode mock health and agent routes", async () => {
   assert.equal(Array.isArray(list), true);
   assert.equal(list[0].id, "sess_index_seed");
   assert.equal(list[0].title, "index seed");
+
+  const chunks4 = [];
+  const res4 = {
+    writeHead(status) {
+      this.status = status;
+    },
+    end(body) {
+      chunks4.push(body);
+    },
+  };
+  assert.equal(mock.handle({ method: "POST", on() {} }, res4, "/session/sess_index_seed/abort"), true);
+  assert.equal(res4.status, 200);
+  assert.equal(JSON.parse(chunks4.join("")).ok, true);
 });
 
 function freePort() {
