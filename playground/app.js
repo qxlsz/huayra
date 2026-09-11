@@ -1,5 +1,6 @@
 (function () {
   const SESSION_STORE_KEY = "huayra.sessions.v1";
+  const ACTIVE_STORE_KEY = "huayra.sessions.active";
   const URL_STORE_KEY = "huayra.opencode.url";
   const GATE_STORE_KEY = "huayra.gate.ok";
   const DEFAULT_OPENCODE = "http://127.0.0.1:4096";
@@ -38,14 +39,44 @@
           lines: Array.isArray(s.lines) ? s.lines : [],
           remoteId: s.remoteId || null,
         }));
+        const savedActive = Number(localStorage.getItem(ACTIVE_STORE_KEY) || "0");
+        state.active = Number.isInteger(savedActive) && savedActive >= 0 && savedActive < state.sessions.length
+          ? savedActive
+          : 0;
+        state.remoteId = state.sessions[state.active].remoteId;
         return;
       }
     } catch {}
     state.sessions = [{ id: "local-1", title: "session 1", lines: [], remoteId: null }];
+    state.active = 0;
   }
 
   function saveSessions() {
     localStorage.setItem(SESSION_STORE_KEY, JSON.stringify(state.sessions));
+    localStorage.setItem(ACTIVE_STORE_KEY, String(state.active));
+  }
+
+  async function activateSession(i) {
+    if (i < 0 || i >= state.sessions.length) return;
+    state.active = i;
+    const sess = state.sessions[i];
+    state.remoteId = sess.remoteId;
+    saveSessions();
+    renderSessions();
+    renderLog();
+    setText("session-label", sess.title);
+    if (sess.remoteId && state.attachedUrl && window.HuayraSessionSync) {
+      const msgs = await window.HuayraSessionSync.fetchRemoteMessages(
+        state.attachedUrl,
+        sess.remoteId,
+        fetchWithTimeout,
+      );
+      if (msgs.length) {
+        sess.lines = msgs;
+        saveSessions();
+        renderLog();
+      }
+    }
   }
 
   function activeSession() {
@@ -82,13 +113,18 @@
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "session-chip" + (i === state.active ? " active" : "");
-      btn.textContent = sess.title;
+      btn.textContent = sess.title + (sess.remoteId ? " ·" : "");
+      btn.title = sess.remoteId ? sess.remoteId : "local · double-click to rename";
       btn.addEventListener("click", () => {
-        state.active = i;
-        state.remoteId = sess.remoteId;
+        activateSession(i);
+      });
+      btn.addEventListener("dblclick", (ev) => {
+        ev.preventDefault();
+        const next = window.prompt("session title", sess.title);
+        if (!next) return;
+        sess.title = next.trim() || sess.title;
+        saveSessions();
         renderSessions();
-        renderLog();
-        setText("session-label", sess.title);
       });
       sessionList.appendChild(btn);
     });
@@ -174,15 +210,34 @@
     return null;
   }
 
+  async function readModels(base) {
+    try {
+      const res = await fetchWithTimeout(base + "/v1/models", { method: "GET", mode: "cors" }, 1200);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : data.data || data.models || [];
+      const first = list[0];
+      return first && (first.id || first.name) ? String(first.id || first.name) : null;
+    } catch {
+      return null;
+    }
+  }
+
   async function readAgent(base) {
     try {
       const res = await fetchWithTimeout(base + "/agent", { method: "GET", mode: "cors" }, 1200);
-      if (!res.ok) return {};
+      if (!res.ok) {
+        const model = await readModels(base);
+        return model ? { agent: "default", model } : {};
+      }
       const data = await res.json();
-      return {
-        agent: data.name || data.id || "build",
-        model: data.model || "-",
-      };
+      const row = Array.isArray(data) ? data[0] : data;
+      const agent = (row && (row.name || row.id)) || "build";
+      let model = (row && row.model) || "-";
+      if (!model || model === "-") {
+        model = (await readModels(base)) || model;
+      }
+      return { agent, model };
     } catch {
       return {};
     }
@@ -202,12 +257,14 @@
       const kind = url.includes("/__opencode") ? "mock" : "live";
       setAttach(kind, url, extra);
       appendLine("sys", "attached " + kind + " " + url, false);
+      syncRemoteSessions().catch(() => {});
       if (kind === "mock") {
         const live = await healthAt(DEFAULT_OPENCODE);
         if (live) {
           const liveExtra = await readAgent(DEFAULT_OPENCODE);
           setAttach("live", DEFAULT_OPENCODE, liveExtra);
           appendLine("sys", "hopped to live OpenCode " + DEFAULT_OPENCODE, false);
+          syncRemoteSessions().catch(() => {});
           return DEFAULT_OPENCODE;
         }
       }
@@ -413,6 +470,7 @@
     saveSessions();
     renderSessions();
     renderLog();
+    setText("session-label", activeSession().title);
   });
   document.getElementById("session-sync").addEventListener("click", () => {
     syncRemoteSessions();
