@@ -58,6 +58,9 @@ test("preview serves the playground and blocks path traversal", async (t) => {
   assert.match(html, /id="templar"/);
   assert.match(html, /id="session-bar"/);
   assert.match(html, /id="agent-label"/);
+  assert.match(html, /id="agent-select"/);
+  assert.match(html, /id="model-select"/);
+  assert.match(html, /id="thinking-select"/);
 
   const missing = await fetch(`http://127.0.0.1:${port}/nope.html`);
   assert.equal(missing.status, 404);
