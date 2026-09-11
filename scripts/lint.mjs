@@ -55,6 +55,15 @@ if (!mascotSrc.includes("guardian-busy.gif") || !mascotSrc.includes("writeMascot
   failed += 1;
   process.stderr.write("scripts/mascot-gifs.mjs missing Guardian/Templar GIF payload\n");
 }
+const playgroundHtml = await readFile(join("playground", "index.html"), "utf8");
+if (!playgroundHtml.includes("./assets/guardian.gif") || !playgroundHtml.includes("./assets/templar.gif")) {
+  failed += 1;
+  process.stderr.write("playground/index.html must reference Guardian/Templar GIFs\n");
+}
+if (!consoleSrc.includes("function paintMascots") || !consoleSrc.includes("mascotSrc")) {
+  failed += 1;
+  process.stderr.write("playground/app.js missing mascot GIF idle/busy swap\n");
+}
 
 if (failed > 0) {
   process.exit(1);
