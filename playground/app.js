@@ -21,10 +21,10 @@
     opencodeUrl: localStorage.getItem(URL_STORE_KEY) || DEFAULT_OPENCODE,
     attachedUrl: null,
     attachedKind: "none",
-    agent: "-",
-    model: "-",
+    agent: localStorage.getItem("huayra.agent") || "-",
+    model: localStorage.getItem("huayra.model") || "-",
     provider: "none",
-    thinking: "idle",
+    thinking: localStorage.getItem("huayra.thinking") || "idle",
     runMode: "idle",
     abort: null,
     remoteId: null,
@@ -321,6 +321,8 @@
     fillSelect(agentSel, state.agents.length ? state.agents : extra.agent ? [extra.agent] : [], extra.agent || state.agent);
     fillSelect(modelSel, state.models.length ? state.models : extra.model ? [extra.model] : [], extra.model || state.model);
     if (thinkSel && state.thinking) thinkSel.value = state.thinking === "run" || state.thinking === "wait" ? "medium" : state.thinking;
+    if (extra.agent && extra.agent !== "-") localStorage.setItem("huayra.agent", extra.agent);
+    if (extra.model && extra.model !== "-") localStorage.setItem("huayra.model", extra.model);
   }
 
   async function pushAgentChoice() {
@@ -602,10 +604,17 @@
   const agentSel = document.getElementById("agent-select");
   const modelSel = document.getElementById("model-select");
   const thinkSel = document.getElementById("thinking-select");
+  function persistCatalog() {
+    if (state.agent && state.agent !== "-") localStorage.setItem("huayra.agent", state.agent);
+    if (state.model && state.model !== "-") localStorage.setItem("huayra.model", state.model);
+    if (state.thinking) localStorage.setItem("huayra.thinking", state.thinking);
+  }
+
   if (agentSel) {
     agentSel.addEventListener("change", () => {
       state.agent = agentSel.value || state.agent;
       setDot("agent-dot", "ok");
+      persistCatalog();
       pushAgentChoice();
     });
   }
@@ -613,6 +622,7 @@
     modelSel.addEventListener("change", () => {
       state.model = modelSel.value || state.model;
       setDot("model-dot", "ok");
+      persistCatalog();
       pushAgentChoice();
     });
   }
@@ -621,6 +631,7 @@
       state.thinking = thinkSel.value || "idle";
       setText("thinking-label", "thinking");
       setDot("thinking-dot", state.thinking === "idle" ? "" : "warn");
+      persistCatalog();
       pushAgentChoice();
     });
   }
@@ -638,11 +649,25 @@
       form.requestSubmit();
     }
   });
-  stopBtn.addEventListener("click", () => {
+  async function abortRemote() {
     if (state.abort) state.abort.abort();
+    const base = state.attachedUrl;
+    const sid = state.remoteId;
+    if (!base || !sid) return;
+    try {
+      await fetchWithTimeout(
+        base + "/session/" + encodeURIComponent(sid) + "/abort",
+        { method: "POST", mode: "cors" },
+        1500,
+      );
+    } catch {}
+  }
+
+  stopBtn.addEventListener("click", () => {
+    abortRemote();
   });
   document.addEventListener("keydown", (ev) => {
-    if (ev.key === "Escape" && state.abort) state.abort.abort();
+    if (ev.key === "Escape") abortRemote();
   });
 
   loadSessions();
