@@ -64,6 +64,10 @@ if (!consoleSrc.includes("function paintMascots") || !consoleSrc.includes("masco
   failed += 1;
   process.stderr.write("playground/app.js missing mascot GIF idle/busy swap\n");
 }
+if (!consoleSrc.includes("function abortRemote") || !consoleSrc.includes("/abort")) {
+  failed += 1;
+  process.stderr.write("playground/app.js missing OpenCode session abort\n");
+}
 
 if (failed > 0) {
   process.exit(1);
