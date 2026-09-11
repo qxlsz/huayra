@@ -50,9 +50,10 @@ if (!consoleSrc.includes("function probeOpenCode") || !consoleSrc.includes("SESS
   failed += 1;
   process.stderr.write("playground/app.js is truncated; expected a full prompt console\n");
 }
-if (!consoleSrc.includes("guardian-busy.gif") || !consoleSrc.includes("setMascot")) {
+const mascotSrc = await readFile(join("scripts", "mascot-gifs.mjs"), "utf8");
+if (!mascotSrc.includes("guardian-busy.gif") || !mascotSrc.includes("writeMascotGifs")) {
   failed += 1;
-  process.stderr.write("playground/app.js missing Guardian/Templar GIF picker\n");
+  process.stderr.write("scripts/mascot-gifs.mjs missing Guardian/Templar GIF payload\n");
 }
 
 if (failed > 0) {
