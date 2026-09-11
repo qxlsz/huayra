@@ -50,6 +50,10 @@ if (!consoleSrc.includes("function probeOpenCode") || !consoleSrc.includes("SESS
   failed += 1;
   process.stderr.write("playground/app.js is truncated; expected a full prompt console\n");
 }
+if (!consoleSrc.includes("guardian-busy.gif") || !consoleSrc.includes("setMascot")) {
+  failed += 1;
+  process.stderr.write("playground/app.js missing Guardian/Templar GIF picker\n");
+}
 
 if (failed > 0) {
   process.exit(1);
