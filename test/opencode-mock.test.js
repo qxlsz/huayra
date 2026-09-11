@@ -41,6 +41,21 @@ test("opencode mock health and agent routes", async () => {
   assert.equal(mock.handle({ method: "GET", on() {} }, res2, "/agent"), true);
   const agent = JSON.parse(chunks2.join(""));
   assert.equal(agent.name, "build");
+
+  const chunks3 = [];
+  const res3 = {
+    writeHead(status) {
+      this.status = status;
+    },
+    end(body) {
+      chunks3.push(body);
+    },
+  };
+  assert.equal(mock.handle({ method: "GET", on() {} }, res3, "/session"), true);
+  const list = JSON.parse(chunks3.join(""));
+  assert.equal(Array.isArray(list), true);
+  assert.equal(list[0].id, "sess_index_seed");
+  assert.equal(list[0].title, "index seed");
 });
 
 function freePort() {
@@ -115,7 +130,6 @@ test("preview mounts OpenCode mock under /__opencode", async (t) => {
   assert.equal(prompt.status, 200);
   const streamText = await prompt.text();
   assert.match(streamText, /mock reply/);
-  // Multi-chunk SSE: tokens may land on separate data lines; join payloads for the full reply.
   const joined = streamText
     .split("\n")
     .map((l) => l.trim())

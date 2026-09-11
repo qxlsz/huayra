@@ -33,6 +33,15 @@ function id() {
 export function createOpenCodeMock() {
   /** @type {Map<string, { id: string, title: string, messages: Array<{role:string,text:string}> }>} */
   const sessions = new Map();
+  const seedId = "sess_index_seed";
+  sessions.set(seedId, {
+    id: seedId,
+    title: "index seed",
+    messages: [
+      { role: "user", text: "list sessions" },
+      { role: "assistant", text: "mock reply: session index is live" },
+    ],
+  });
 
   /**
    * @param {import('node:http').IncomingMessage} req
@@ -48,7 +57,6 @@ export function createOpenCodeMock() {
     }
 
     if ((path === "/global/health" || path === "/health") && method === "GET") {
-      // Match upstream OpenCode shape ({ healthy, version }) and keep ok for older clients.
       json(res, 200, { healthy: true, ok: true, version: "mock-1.0.0" });
       return true;
     }
@@ -144,8 +152,6 @@ export function createOpenCodeMock() {
         } catch {}
         userText = String(userText || "").trim() || "(empty)";
         s.messages.push({ role: "user", text: userText });
-        // Faithful console: multi-chunk SSE so the playground streams one assistant line.
-        // Keep a short "mock reply" marker for tests and local debugging.
         const snippet = userText.slice(0, 200);
         const reply = `mock reply: ${snippet}`;
         s.messages.push({ role: "assistant", text: reply });
