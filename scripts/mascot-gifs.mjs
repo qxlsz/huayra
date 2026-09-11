@@ -1,0 +1,26 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const FILES = {
+  "guardian.gif":
+    "R0lGODlhHAAcAIEAAAsLDxISGnqi957OaiH/C05FVFNDQVBFMi4wAwEAAAAh+QQIQAAAACwAAAAAHAAcAEAIagADCBxIsKDBgwgFCADAUCFDAAoRGhxAcUAAhRgFBKhoUaLHjyBDisxIEqPIgiVPqlRZMuVJhw0XxmTZMuNKgS5v6tzJs6fPnx5r2nwpE2LRiESFakwqlKZSkRwvktxYcWVOnVeBat0aMiAAOw==",
+  "guardian-busy.gif":
+    "R0lGODlhHAAcAIIAAAsLDxISGnqi957OavDw9QAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQICwAAACwAAAAAHAAcAAAIawADCBxIsKDBgwgTKlzIsKHDhxAjSiwooKLFixUhYtwoQKMAACArggSQ8aHIkB9Rehx5kmRHkxcJbPQYEyNNjiUd4rx4E6fDAUAHBJgZVOjCokNtIu35cmJSnk6fWowqNSfVq1izat3KNUBAACH5BAgLAAAALAAAAAAcABwAggsLDxISGnqi957OavDw9QAAAAAAAAAAAAhrAAMIHEiwoMGDCBMqXMiwocOHECNKLCigosWLFSFi3ChAI8eLHgGIrCgSQMaHJEcKKHnSYUoABFaq9HgxJkiUHy3SzLnz48SNEQcIHRAA6FCiC48WxRhAac+OEwUCjbr0JtWrWLNq3co1YUAAIfkECAsAAAAsAAAAABwAHACCCwsPEhIaeqL3ns5q8PD1AAAAAAAAAAAACGoAAwgcSLCgwYMIEypcyLChw4cQI0osKKCixYsVIWLcKECjAAAgK4IEkPGhyJAfUXoceZJkR5MXCWz0GBMjTY4lHeK8eBPnxJkQBwgdEGDmUKILjxa1qbTny4lLeUKNanGq1atYs2rdujAgACH5BAgLAAAALAAAAAAcABwAggsLDxISGnqi957OavDw9QAAAAAAAAAAAAhrAAMIHEiwoMGDCBMqXMiwocOHECNKLCigosWLFSFi3ChAI8eLHgGIrCgSQMaHJEcKKHnSYUoABFaq9HgxJkiUHy3SzLnz48SNEQcIHRAA6FCiC48WxRhAac+OEwUCjbr0JtWrWLNq3co1YUAAOw==",
+  "templar.gif":
+    "R0lGODlhHAAcAIEAAAsLDxISGuCvaPd2jiH/C05FVFNDQVBFMi4wAwEAAAAh+QQIQAAAACwAAAAAHAAcAEAIZgADCBxIsKDBgwgDCFjIsGHChwMiSoz4sKLFiwobasTIsaPAiRM9irS4EACAkicFiNS4kSNDkBIZeoRJcaTNmzhz6szIcuFKASZR+vTYUybRoipF0hxwVMBSoxyX2pS6s6rVqxwDAgA7",
+  "templar-busy.gif":
+    "R0lGODlhHAAcAIIAAAsLDxISGuCvaPd2jvDw9Xqi9wAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQICwAAACwAAAAAHAAcAAAIaAADCBxIsKDBgwgTKlzIsKHDhwEESJxIEaJAihgFWIwoAAAAiR4lbgT5sWPJkRknokyp0SJLkS5fbpypcIDNmzZjCsCJU2XDiTxv+nx4kwBOmjgL3EQadADToE950pxKtarVq1izbgwIACH5BAgLAAAALAAAAAAcABwAggsLDxISGuCvaPd2jvDw9Xqi9wAAAAAAAAhrAAMIHEiwoMGDCBMqXMiwocOHEBsKmEixYsQAFTMKuDgRAICOHzdGBElSJESNFkeinMhxpcmHLl8+HECzJs2TLG3axMhyIcUAOmvylLmwJoGdF4HWLCA0adCbTp8mVRp0qtWrWLNq3cr1YkAAIfkECAsAAAAsAAAAABwAHACCCwsPEhIa4K9o93aO8PD1eqL3AAAAAAAACGkAAwgcSLCgwYMIEypcyLChw4cBBEicSBGiQIoYBViMKAAAAIkeJW4E+bFjyZEZJ6JMqdEiS5EuX26cqXCAzZs2IarEiZNjS4U7eeZU+fAmgZ4zcRa4SVNozqROm0alSbWq1atYs2q1GBAAIfkECAsAAAAsAAAAABwAHACCCwsPEhIa4K9o93aO8PD1eqL3AAAAAAAACGsAAwgcSLCgwYMIEypcyLChw4cQGwqYSLFixAAVMwq4OBEAgI4fN0YESVIkRI0WR6KcyHGlyYcuXz4cQLMmzZMsbdrEyHIhxQA6a/KUubAmgZ0XgdYsIDRp0JtOnyZVGnSq1atYs2rdyvViQAA7",
+};
+
+export async function writeMascotGifs(targetDir) {
+  await mkdir(targetDir, { recursive: true });
+  for (const [name, b64] of Object.entries(FILES)) {
+    await writeFile(join(targetDir, name), Buffer.from(b64, "base64"));
+  }
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+  await writeMascotGifs(join(root, "playground", "assets"));
+}
