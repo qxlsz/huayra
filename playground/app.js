@@ -25,8 +25,11 @@
     model: "-",
     provider: "none",
     thinking: "idle",
+    runMode: "idle",
     abort: null,
     remoteId: null,
+    agents: [],
+    models: [],
   };
 
   function loadSessions() {
@@ -143,13 +146,18 @@
   }
 
   function setThinking(mode) {
-    state.thinking = mode;
-    setText("thinking-label", "thinking " + mode);
-    setDot("thinking-dot", mode === "idle" ? "" : mode === "error" ? "err" : "warn");
+    state.runMode = mode;
+    const depth = state.thinking || "idle";
+    setText("thinking-label", mode === "run" ? "thinking " + depth : "thinking");
+    setDot("thinking-dot", mode === "idle" ? (depth === "idle" ? "" : "warn") : mode === "error" ? "err" : "warn");
     const guardian = document.getElementById("guardian");
     const templar = document.getElementById("templar");
     if (guardian) guardian.classList.toggle("on", mode !== "run");
     if (templar) templar.classList.toggle("on", mode === "run" || mode === "wait");
+    const thinkSel = document.getElementById("thinking-select");
+    if (thinkSel && thinkSel.value !== depth && (depth === "idle" || depth === "low" || depth === "medium" || depth === "high")) {
+      thinkSel.value = depth;
+    }
   }
 
   function setAttach(kind, url, extra) {
@@ -177,14 +185,15 @@
     }
     if (extra && extra.agent) {
       state.agent = extra.agent;
-      setText("agent-label", "agent " + extra.agent);
+      setText("agent-label", "agent");
       setDot("agent-dot", "ok");
     }
     if (extra && extra.model) {
       state.model = extra.model;
-      setText("model-label", "model " + extra.model);
+      setText("model-label", "model");
       setDot("model-dot", "ok");
     }
+    applyCatalog(extra || {});
   }
 
   function fetchWithTimeout(url, opts, ms) {
@@ -213,34 +222,95 @@
   async function readModels(base) {
     try {
       const res = await fetchWithTimeout(base + "/v1/models", { method: "GET", mode: "cors" }, 1200);
-      if (!res.ok) return null;
+      if (!res.ok) return [];
       const data = await res.json();
       const list = Array.isArray(data) ? data : data.data || data.models || [];
-      const first = list[0];
-      return first && (first.id || first.name) ? String(first.id || first.name) : null;
+      return list
+        .map((m) => String((m && (m.id || m.name)) || ""))
+        .filter(Boolean);
     } catch {
-      return null;
+      return [];
     }
   }
 
   async function readAgent(base) {
     try {
+      const models = await readModels(base);
       const res = await fetchWithTimeout(base + "/agent", { method: "GET", mode: "cors" }, 1200);
       if (!res.ok) {
-        const model = await readModels(base);
-        return model ? { agent: "default", model } : {};
+        return models.length ? { agent: "default", model: models[0], agents: ["default"], models } : {};
       }
       const data = await res.json();
       const row = Array.isArray(data) ? data[0] : data;
       const agent = (row && (row.name || row.id)) || "build";
-      let model = (row && row.model) || "-";
-      if (!model || model === "-") {
-        model = (await readModels(base)) || model;
-      }
-      return { agent, model };
+      let model = (row && row.model) || "";
+      const catalog = Array.isArray(row && row.agents) ? row.agents : Array.isArray(data && data.agents) ? data.agents : [];
+      const agents = catalog
+        .map((a) => String((a && (a.name || a.id)) || a || ""))
+        .filter(Boolean);
+      if (!agents.includes(agent)) agents.unshift(agent);
+      if (!model || model === "-") model = models[0] || model || "-";
+      if (model && model !== "-" && !models.includes(model)) models.unshift(model);
+      return { agent, model, agents, models };
     } catch {
       return {};
     }
+  }
+
+  function fillSelect(el, values, selected) {
+    if (!el) return;
+    const uniq = [];
+    for (const v of values || []) {
+      if (v && !uniq.includes(v)) uniq.push(v);
+    }
+    if (selected && selected !== "-" && !uniq.includes(selected)) uniq.unshift(selected);
+    el.replaceChildren();
+    if (!uniq.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "-";
+      el.appendChild(opt);
+      el.disabled = true;
+      return;
+    }
+    for (const v of uniq) {
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      if (v === selected) opt.selected = true;
+      el.appendChild(opt);
+    }
+    el.disabled = false;
+    if (selected) el.value = selected;
+  }
+
+  function applyCatalog(extra) {
+    if (!extra) return;
+    const agentSel = document.getElementById("agent-select");
+    const modelSel = document.getElementById("model-select");
+    const thinkSel = document.getElementById("thinking-select");
+    if (extra.agents) state.agents = extra.agents;
+    if (extra.models) state.models = extra.models;
+    fillSelect(agentSel, state.agents.length ? state.agents : extra.agent ? [extra.agent] : [], extra.agent || state.agent);
+    fillSelect(modelSel, state.models.length ? state.models : extra.model ? [extra.model] : [], extra.model || state.model);
+    if (thinkSel && state.thinking) thinkSel.value = state.thinking === "run" || state.thinking === "wait" ? "medium" : state.thinking;
+  }
+
+  async function pushAgentChoice() {
+    const base = state.attachedUrl;
+    if (!base) return;
+    try {
+      await fetchWithTimeout(
+        base + "/agent",
+        {
+          method: "POST",
+          mode: "cors",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ agent: state.agent, model: state.model, thinking: state.thinking }),
+        },
+        1500,
+      );
+    } catch {}
   }
 
   async function probeOpenCode(preferred) {
@@ -356,7 +426,12 @@
         method: "POST",
         mode: "cors",
         headers: { "content-type": "application/json", accept: "text/event-stream" },
-        body: JSON.stringify({ parts: [{ type: "text", text }] }),
+        body: JSON.stringify({
+          parts: [{ type: "text", text }],
+          agent: state.agent,
+          model: state.model,
+          thinking: state.thinking,
+        }),
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) {
@@ -491,6 +566,32 @@
     }
     probeOpenCode(state.opencodeUrl);
   });
+
+  const agentSel = document.getElementById("agent-select");
+  const modelSel = document.getElementById("model-select");
+  const thinkSel = document.getElementById("thinking-select");
+  if (agentSel) {
+    agentSel.addEventListener("change", () => {
+      state.agent = agentSel.value || state.agent;
+      setDot("agent-dot", "ok");
+      pushAgentChoice();
+    });
+  }
+  if (modelSel) {
+    modelSel.addEventListener("change", () => {
+      state.model = modelSel.value || state.model;
+      setDot("model-dot", "ok");
+      pushAgentChoice();
+    });
+  }
+  if (thinkSel) {
+    thinkSel.addEventListener("change", () => {
+      state.thinking = thinkSel.value || "idle";
+      setText("thinking-label", "thinking");
+      setDot("thinking-dot", state.thinking === "idle" ? "" : "warn");
+      pushAgentChoice();
+    });
+  }
 
   form.addEventListener("submit", (ev) => {
     ev.preventDefault();
