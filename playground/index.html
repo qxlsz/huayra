@@ -94,6 +94,26 @@
     .dot.ok { background: var(--ok); }
     .dot.warn { background: var(--warn); }
     .dot.err { background: var(--err); }
+    .sr {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+    .status-row select {
+      font: inherit;
+      font-size: 11px;
+      color: var(--text);
+      background: #1a1a28;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 4px;
+      max-width: 140px;
+    }
+    .status-row select:disabled {
+      color: var(--muted);
+    }
     #session-bar {
       display: flex;
       align-items: center;
@@ -266,9 +286,33 @@
     <div class="status-row" aria-label="Status">
       <span class="pill reprobe" id="opencode-pill" title="click to re-probe OpenCode · shift+click to set URL"><span id="opencode-dot" class="dot"></span><span id="opencode-label">OpenCode …</span></span>
       <span class="pill"><span id="provider-dot" class="dot"></span><span id="provider-label">provider none</span></span>
-      <span class="pill"><span id="agent-dot" class="dot"></span><span id="agent-label">agent -</span></span>
-      <span class="pill"><span id="model-dot" class="dot"></span><span id="model-label">model -</span></span>
-      <span class="pill"><span id="thinking-dot" class="dot"></span><span id="thinking-label">thinking idle</span></span>
+      <span class="pill">
+        <span id="agent-dot" class="dot"></span>
+        <label class="sr" for="agent-select">agent</label>
+        <span id="agent-label">agent</span>
+        <select id="agent-select" title="OpenCode agent" disabled>
+          <option value="">-</option>
+        </select>
+      </span>
+      <span class="pill">
+        <span id="model-dot" class="dot"></span>
+        <label class="sr" for="model-select">model</label>
+        <span id="model-label">model</span>
+        <select id="model-select" title="OpenCode model" disabled>
+          <option value="">-</option>
+        </select>
+      </span>
+      <span class="pill">
+        <span id="thinking-dot" class="dot"></span>
+        <label class="sr" for="thinking-select">thinking</label>
+        <span id="thinking-label">thinking</span>
+        <select id="thinking-select" title="thinking mode">
+          <option value="idle">idle</option>
+          <option value="low">low</option>
+          <option value="medium">medium</option>
+          <option value="high">high</option>
+        </select>
+      </span>
       <span class="pill"><span id="gate-dot" class="dot"></span><span id="gate-label">gate off</span></span>
       <span class="pill"><span id="session-dot" class="dot ok"></span><span id="session-label">session 1</span></span>
     </div>
