@@ -59,6 +59,7 @@ test("preview serves the playground and blocks path traversal", async (t) => {
   assert.match(html, /assets\/guardian\.gif/);
   assert.match(html, /assets\/templar\.gif/);
   assert.match(html, /id="session-bar"/);
+  assert.match(html, /id="session-close"/);
   assert.match(html, /id="agent-label"/);
   assert.match(html, /id="agent-select"/);
   assert.match(html, /id="model-select"/);
