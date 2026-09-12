@@ -132,6 +132,22 @@ test("preview mounts OpenCode mock under /__opencode", async (t) => {
   const sess = await create.json();
   assert.ok(sess.id);
 
+  const patch = await fetch(
+    `http://127.0.0.1:${port}${OPENCODE_MOCK_PREFIX}/session/${encodeURIComponent(sess.id)}`,
+    {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "renamed-index" }),
+    },
+  );
+  assert.equal(patch.status, 200);
+  const renamed = await patch.json();
+  assert.equal(renamed.title, "renamed-index");
+
+  const listed = await fetch(`http://127.0.0.1:${port}${OPENCODE_MOCK_PREFIX}/session`);
+  const listBody = await listed.json();
+  assert.equal(listBody.some((s) => s.id === sess.id && s.title === "renamed-index"), true);
+
   const prompt = await fetch(
     `http://127.0.0.1:${port}${OPENCODE_MOCK_PREFIX}/session/${encodeURIComponent(sess.id)}/prompt`,
     {
