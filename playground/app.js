@@ -494,39 +494,84 @@
     renderLog();
     appendLine("sys", "synced " + remote.length + " remote session(s)", false);
   }
-  function openGateIfNeeded() {
-    const required = new URLSearchParams(location.search).get("gate");
-    if (!required) {
-      setText("gate-label", "gate off");
-      setDot("gate-dot", "ok");
+  function hideGate() {
+    if (!gateEl) return;
+    gateEl.classList.remove("open");
+    gateEl.setAttribute("aria-hidden", "true");
+  }
+  function showGateAfterPaint() {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!gateEl) return;
+        gateEl.classList.add("open");
+        gateEl.setAttribute("aria-hidden", "false");
+      });
+    });
+  }
+  async function probeHostGate() {
+    const queryGate = new URLSearchParams(location.search).get("gate");
+    const stored = sessionStorage.getItem(GATE_STORE_KEY);
+    if (stored === "skip") {
+      setText("gate-label", "gate skipped");
+      setDot("gate-dot", "warn");
+      hideGate();
       return;
     }
-    if (sessionStorage.getItem(GATE_STORE_KEY) === "1") {
+    if (stored === "1") {
       setText("gate-label", "gate open");
       setDot("gate-dot", "ok");
+      hideGate();
+      return;
+    }
+    let serverRequired = false;
+    try {
+      const res = await fetchWithTimeout("/__gate", { method: "GET" }, 800);
+      if (res && res.ok) {
+        const data = await res.json().catch(() => ({}));
+        serverRequired = Boolean(data && data.required);
+      }
+    } catch {}
+    const needed = serverRequired || Boolean(queryGate);
+    if (!needed) {
+      setText("gate-label", "gate off");
+      setDot("gate-dot", "ok");
+      hideGate();
       return;
     }
     setText("gate-label", "gate locked");
     setDot("gate-dot", "warn");
-    gateEl.classList.add("open");
-    gateEl.setAttribute("aria-hidden", "false");
+    showGateAfterPaint();
   }
   document.getElementById("gate-skip").addEventListener("click", () => {
-    gateEl.classList.remove("open");
-    gateEl.setAttribute("aria-hidden", "true");
+    sessionStorage.setItem(GATE_STORE_KEY, "skip");
+    hideGate();
     setText("gate-label", "gate skipped");
     setDot("gate-dot", "warn");
   });
-  document.getElementById("gate-unlock").addEventListener("click", () => {
-    const required = new URLSearchParams(location.search).get("gate") || "";
-    if (required && phraseEl.value !== required) {
+  document.getElementById("gate-unlock").addEventListener("click", async () => {
+    const queryGate = new URLSearchParams(location.search).get("gate") || "";
+    const phrase = phraseEl.value || "";
+    let ok = false;
+    try {
+      const res = await fetchWithTimeout("/__gate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ phrase }),
+      }, 1200);
+      if (res) {
+        const data = await res.json().catch(() => ({}));
+        if (data && data.required === false) ok = true;
+        else if (res.ok && data && data.ok) ok = true;
+      }
+    } catch {}
+    if (!ok && queryGate) ok = phrase === queryGate;
+    if (!ok) {
       setText("gate-label", "gate denied");
       setDot("gate-dot", "err");
       return;
     }
     sessionStorage.setItem(GATE_STORE_KEY, "1");
-    gateEl.classList.remove("open");
-    gateEl.setAttribute("aria-hidden", "true");
+    hideGate();
     setText("gate-label", "gate open");
     setDot("gate-dot", "ok");
   });
@@ -651,7 +696,7 @@
   renderSessions();
   renderLog();
   setThinking("idle");
-  openGateIfNeeded();
   appendLine("sys", "Huayra playground. Credit Charles @zanneth. MIT.", false);
   probeOpenCode();
+  probeHostGate();
 })();
