@@ -77,6 +77,10 @@ if (!syncSrc.includes("renameRemoteSession") || !consoleSrc.includes("renameRemo
   failed += 1;
   process.stderr.write("session index missing remote rename (PATCH title)\n");
 }
+if (!consoleSrc.includes("function autoTitleFromPrompt") || !consoleSrc.includes("function titleFromPrompt")) {
+  failed += 1;
+  process.stderr.write("playground/app.js missing first-prompt Session Index auto-title\n");
+}
 
 if (failed > 0) {
   process.exit(1);
