@@ -105,13 +105,17 @@
       btn.textContent = sess.title + (sess.remoteId ? " ·" : "");
       btn.title = sess.remoteId ? sess.remoteId : "local · double-click to rename";
       btn.addEventListener("click", () => { activateSession(i); });
-      btn.addEventListener("dblclick", (ev) => {
+      btn.addEventListener("dblclick", async (ev) => {
         ev.preventDefault();
         const next = window.prompt("session title", sess.title);
         if (!next) return;
         sess.title = next.trim() || sess.title;
         saveSessions();
         renderSessions();
+        const api = window.HuayraSessionSync;
+        if (sess.remoteId && state.attachedUrl && api && api.renameRemoteSession) {
+          await api.renameRemoteSession(state.attachedUrl, sess.remoteId, sess.title, fetchWithTimeout);
+        }
       });
       sessionList.appendChild(btn);
     });
