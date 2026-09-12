@@ -5,7 +5,6 @@
   const GATE_STORE_KEY = "huayra.gate.ok";
   const DEFAULT_OPENCODE = "http://127.0.0.1:4096";
   const MOCK_OPENCODE = new URL("/__opencode", location.origin).href.replace(/\/$/, "");
-
   const logEl = document.getElementById("log");
   const form = document.getElementById("prompt-form");
   const promptEl = document.getElementById("prompt");
@@ -14,7 +13,6 @@
   const sessionList = document.getElementById("session-list");
   const gateEl = document.getElementById("gate");
   const phraseEl = document.getElementById("phrase");
-
   const state = {
     sessions: [],
     active: 0,
@@ -32,7 +30,6 @@
     models: [],
     mascot: localStorage.getItem("huayra.mascot") || "guardian",
   };
-
   function loadSessions() {
     try {
       const raw = JSON.parse(localStorage.getItem(SESSION_STORE_KEY) || "[]");
@@ -44,9 +41,7 @@
           remoteId: s.remoteId || null,
         }));
         const savedActive = Number(localStorage.getItem(ACTIVE_STORE_KEY) || "0");
-        state.active = Number.isInteger(savedActive) && savedActive >= 0 && savedActive < state.sessions.length
-          ? savedActive
-          : 0;
+        state.active = Number.isInteger(savedActive) && savedActive >= 0 && savedActive < state.sessions.length ? savedActive : 0;
         state.remoteId = state.sessions[state.active].remoteId;
         return;
       }
@@ -54,12 +49,10 @@
     state.sessions = [{ id: "local-1", title: "session 1", lines: [], remoteId: null }];
     state.active = 0;
   }
-
   function saveSessions() {
     localStorage.setItem(SESSION_STORE_KEY, JSON.stringify(state.sessions));
     localStorage.setItem(ACTIVE_STORE_KEY, String(state.active));
   }
-
   async function activateSession(i) {
     if (i < 0 || i >= state.sessions.length) return;
     state.active = i;
@@ -70,11 +63,7 @@
     renderLog();
     setText("session-label", sess.title);
     if (sess.remoteId && state.attachedUrl && window.HuayraSessionSync) {
-      const msgs = await window.HuayraSessionSync.fetchRemoteMessages(
-        state.attachedUrl,
-        sess.remoteId,
-        fetchWithTimeout,
-      );
+      const msgs = await window.HuayraSessionSync.fetchRemoteMessages(state.attachedUrl, sess.remoteId, fetchWithTimeout);
       if (msgs.length) {
         sess.lines = msgs;
         saveSessions();
@@ -82,11 +71,9 @@
       }
     }
   }
-
   function activeSession() {
     return state.sessions[state.active] || state.sessions[0];
   }
-
   function appendLine(cls, text, persist) {
     const p = document.createElement("p");
     p.className = "line " + cls;
@@ -99,7 +86,6 @@
       saveSessions();
     }
   }
-
   function renderLog() {
     logEl.replaceChildren();
     for (const line of activeSession().lines) {
@@ -110,7 +96,6 @@
     }
     logEl.scrollTop = logEl.scrollHeight;
   }
-
   function renderSessions() {
     sessionList.replaceChildren();
     state.sessions.forEach((sess, i) => {
@@ -119,9 +104,7 @@
       btn.className = "session-chip" + (i === state.active ? " active" : "");
       btn.textContent = sess.title + (sess.remoteId ? " ·" : "");
       btn.title = sess.remoteId ? sess.remoteId : "local · double-click to rename";
-      btn.addEventListener("click", () => {
-        activateSession(i);
-      });
+      btn.addEventListener("click", () => { activateSession(i); });
       btn.addEventListener("dblclick", (ev) => {
         ev.preventDefault();
         const next = window.prompt("session title", sess.title);
@@ -134,18 +117,15 @@
     });
     setText("session-label", activeSession().title);
   }
-
   function setDot(id, kind) {
     const el = document.getElementById(id);
     if (!el) return;
     el.className = "dot" + (kind ? " " + kind : "");
   }
-
   function setText(id, text) {
     const el = document.getElementById(id);
     if (el) el.textContent = text;
   }
-
   function setThinking(mode) {
     state.runMode = mode;
     const depth = state.thinking || "idle";
@@ -157,11 +137,9 @@
       thinkSel.value = depth;
     }
   }
-
   function mascotSrc(name, busy) {
     return "./assets/" + name + (busy ? "-busy.gif" : ".gif");
   }
-
   function paintMascots(mode) {
     const busy = mode === "run" || mode === "wait";
     const picked = state.mascot === "templar" ? "templar" : "guardian";
@@ -180,13 +158,11 @@
       templar.title = "High Templar " + (busy && picked === "templar" ? "busy" : "idle") + ". Click to pick.";
     }
   }
-
   function pickMascot(name) {
     state.mascot = name === "templar" ? "templar" : "guardian";
     localStorage.setItem("huayra.mascot", state.mascot);
     paintMascots(state.runMode);
   }
-
   function setAttach(kind, url, extra) {
     state.attachedKind = kind;
     state.attachedUrl = url;
@@ -222,14 +198,12 @@
     }
     applyCatalog(extra || {});
   }
-
   function fetchWithTimeout(url, opts, ms) {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), ms);
     const merged = Object.assign({}, opts || {}, { signal: ctrl.signal });
     return fetch(url, merged).finally(() => clearTimeout(t));
   }
-
   async function healthAt(base) {
     const paths = ["/global/health", "/health", "/"];
     for (const path of paths) {
@@ -237,44 +211,34 @@
         const res = await fetchWithTimeout(base + path, { method: "GET", mode: "cors" }, 1200);
         if (!res.ok) continue;
         const data = await res.json().catch(() => ({}));
-        if (data && (data.healthy === true || data.ok === true || data.service)) {
-          return data;
-        }
+        if (data && (data.healthy === true || data.ok === true || data.service)) return data;
         if (res.ok) return data || { ok: true };
       } catch {}
     }
     return null;
   }
-
   async function readModels(base) {
     try {
       const res = await fetchWithTimeout(base + "/v1/models", { method: "GET", mode: "cors" }, 1200);
       if (!res.ok) return [];
       const data = await res.json();
       const list = Array.isArray(data) ? data : data.data || data.models || [];
-      return list
-        .map((m) => String((m && (m.id || m.name)) || ""))
-        .filter(Boolean);
+      return list.map((m) => String((m && (m.id || m.name)) || "")).filter(Boolean);
     } catch {
       return [];
     }
   }
-
   async function readAgent(base) {
     try {
       const models = await readModels(base);
       const res = await fetchWithTimeout(base + "/agent", { method: "GET", mode: "cors" }, 1200);
-      if (!res.ok) {
-        return models.length ? { agent: "default", model: models[0], agents: ["default"], models } : {};
-      }
+      if (!res.ok) return models.length ? { agent: "default", model: models[0], agents: ["default"], models } : {};
       const data = await res.json();
       const row = Array.isArray(data) ? data[0] : data;
       const agent = (row && (row.name || row.id)) || "build";
       let model = (row && row.model) || "";
       const catalog = Array.isArray(row && row.agents) ? row.agents : Array.isArray(data && data.agents) ? data.agents : [];
-      const agents = catalog
-        .map((a) => String((a && (a.name || a.id)) || a || ""))
-        .filter(Boolean);
+      const agents = catalog.map((a) => String((a && (a.name || a.id)) || a || "")).filter(Boolean);
       if (!agents.includes(agent)) agents.unshift(agent);
       if (!model || model === "-") model = models[0] || model || "-";
       if (model && model !== "-" && !models.includes(model)) models.unshift(model);
@@ -283,7 +247,6 @@
       return {};
     }
   }
-
   function fillSelect(el, values, selected) {
     if (!el) return;
     const uniq = [];
@@ -310,7 +273,6 @@
     el.disabled = false;
     if (selected) el.value = selected;
   }
-
   function applyCatalog(extra) {
     if (!extra) return;
     const agentSel = document.getElementById("agent-select");
@@ -324,31 +286,24 @@
     if (extra.agent && extra.agent !== "-") localStorage.setItem("huayra.agent", extra.agent);
     if (extra.model && extra.model !== "-") localStorage.setItem("huayra.model", extra.model);
   }
-
   async function pushAgentChoice() {
     const base = state.attachedUrl;
     if (!base) return;
     try {
-      await fetchWithTimeout(
-        base + "/agent",
-        {
-          method: "POST",
-          mode: "cors",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ agent: state.agent, model: state.model, thinking: state.thinking }),
-        },
-        1500,
-      );
+      await fetchWithTimeout(base + "/agent", {
+        method: "POST",
+        mode: "cors",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ agent: state.agent, model: state.model, thinking: state.thinking }),
+      }, 1500);
     } catch {}
   }
-
   async function probeOpenCode(preferred) {
     const candidates = [];
     if (preferred) candidates.push(preferred);
     if (state.opencodeUrl && !candidates.includes(state.opencodeUrl)) candidates.push(state.opencodeUrl);
     if (!candidates.includes(DEFAULT_OPENCODE)) candidates.push(DEFAULT_OPENCODE);
     if (!candidates.includes(MOCK_OPENCODE)) candidates.push(MOCK_OPENCODE);
-
     for (const url of candidates) {
       const health = await healthAt(url);
       if (!health) continue;
@@ -373,7 +328,6 @@
     appendLine("sys", "OpenCode not reachable (tried " + candidates.join(", ") + ")", false);
     return null;
   }
-
   async function ensureRemoteSession() {
     const base = state.attachedUrl;
     if (!base) return null;
@@ -383,16 +337,12 @@
       return sess.remoteId;
     }
     try {
-      const res = await fetchWithTimeout(
-        base + "/session",
-        {
-          method: "POST",
-          mode: "cors",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ title: sess.title }),
-        },
-        2500,
-      );
+      const res = await fetchWithTimeout(base + "/session", {
+        method: "POST",
+        mode: "cors",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title: sess.title }),
+      }, 2500);
       if (!res.ok) return null;
       const data = await res.json();
       const id = data.id;
@@ -405,7 +355,6 @@
       return null;
     }
   }
-
   function parseSseText(chunk) {
     let out = "";
     const blocks = String(chunk).split("\n\n");
@@ -426,7 +375,6 @@
     }
     return out;
   }
-
   async function sendPrompt(text) {
     appendLine("user", text);
     if (!state.attachedUrl) {
@@ -455,12 +403,7 @@
         method: "POST",
         mode: "cors",
         headers: { "content-type": "application/json", accept: "text/event-stream" },
-        body: JSON.stringify({
-          parts: [{ type: "text", text }],
-          agent: state.agent,
-          model: state.model,
-          thinking: state.thinking,
-        }),
+        body: JSON.stringify({ parts: [{ type: "text", text: text }], agent: state.agent, model: state.model, thinking: state.thinking }),
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) {
@@ -496,7 +439,6 @@
       setThinking("idle");
     }
   }
-
   async function syncRemoteSessions() {
     const api = window.HuayraSessionSync;
     if (!api || !state.attachedUrl) {
@@ -511,12 +453,7 @@
     for (const item of remote) {
       let sess = state.sessions.find((s) => s.remoteId === item.id);
       if (!sess) {
-        sess = {
-          id: "remote-" + item.id,
-          title: item.title || item.id.slice(0, 8),
-          lines: [],
-          remoteId: item.id,
-        };
+        sess = { id: "remote-" + item.id, title: item.title || item.id.slice(0, 8), lines: [], remoteId: item.id };
         state.sessions.push(sess);
       }
       const msgs = await api.fetchRemoteMessages(state.attachedUrl, item.id, fetchWithTimeout);
@@ -527,7 +464,6 @@
     renderLog();
     appendLine("sys", "synced " + remote.length + " remote session(s)", false);
   }
-
   function openGateIfNeeded() {
     const required = new URLSearchParams(location.search).get("gate");
     if (!required) {
@@ -545,7 +481,6 @@
     gateEl.classList.add("open");
     gateEl.setAttribute("aria-hidden", "false");
   }
-
   document.getElementById("gate-skip").addEventListener("click", () => {
     gateEl.classList.remove("open");
     gateEl.setAttribute("aria-hidden", "true");
@@ -565,7 +500,6 @@
     setText("gate-label", "gate open");
     setDot("gate-dot", "ok");
   });
-
   document.getElementById("session-new").addEventListener("click", () => {
     const n = state.sessions.length + 1;
     state.sessions.push({ id: "local-" + n, title: "session " + n, lines: [], remoteId: null });
@@ -576,20 +510,44 @@
     renderLog();
     setText("session-label", activeSession().title);
   });
-  document.getElementById("session-sync").addEventListener("click", () => {
-    syncRemoteSessions();
-  });
+  document.getElementById("session-sync").addEventListener("click", () => { syncRemoteSessions(); });
+  async function closeActiveSession() {
+    const sess = activeSession();
+    if (!sess) return;
+    const api = window.HuayraSessionSync;
+    if (sess.remoteId && state.attachedUrl && api && api.deleteRemoteSession) {
+      await api.deleteRemoteSession(state.attachedUrl, sess.remoteId, fetchWithTimeout);
+    }
+    if (state.sessions.length <= 1) {
+      sess.lines = [];
+      sess.remoteId = null;
+      sess.title = "session 1";
+      state.remoteId = null;
+      saveSessions();
+      renderSessions();
+      renderLog();
+      appendLine("sys", "closed last session; index reset", false);
+      return;
+    }
+    const idx = state.active;
+    state.sessions.splice(idx, 1);
+    state.active = Math.min(idx, state.sessions.length - 1);
+    state.remoteId = state.sessions[state.active].remoteId;
+    saveSessions();
+    renderSessions();
+    renderLog();
+    appendLine("sys", "closed session", false);
+  }
+  document.getElementById("session-close").addEventListener("click", () => { closeActiveSession(); });
   document.getElementById("session-clear").addEventListener("click", () => {
     activeSession().lines = [];
     saveSessions();
     renderLog();
   });
-
   const guardianBtn = document.getElementById("guardian");
   const templarBtn = document.getElementById("templar");
   if (guardianBtn) guardianBtn.addEventListener("click", () => pickMascot("guardian"));
   if (templarBtn) templarBtn.addEventListener("click", () => pickMascot("templar"));
-
   document.getElementById("opencode-pill").addEventListener("click", (ev) => {
     if (ev.shiftKey) {
       const next = window.prompt("OpenCode URL", state.opencodeUrl || DEFAULT_OPENCODE);
@@ -600,7 +558,6 @@
     }
     probeOpenCode(state.opencodeUrl);
   });
-
   const agentSel = document.getElementById("agent-select");
   const modelSel = document.getElementById("model-select");
   const thinkSel = document.getElementById("thinking-select");
@@ -609,7 +566,6 @@
     if (state.model && state.model !== "-") localStorage.setItem("huayra.model", state.model);
     if (state.thinking) localStorage.setItem("huayra.thinking", state.thinking);
   }
-
   if (agentSel) {
     agentSel.addEventListener("change", () => {
       state.agent = agentSel.value || state.agent;
@@ -635,7 +591,6 @@
       pushAgentChoice();
     });
   }
-
   form.addEventListener("submit", (ev) => {
     ev.preventDefault();
     const text = promptEl.value.trim();
@@ -655,21 +610,13 @@
     const sid = state.remoteId;
     if (!base || !sid) return;
     try {
-      await fetchWithTimeout(
-        base + "/session/" + encodeURIComponent(sid) + "/abort",
-        { method: "POST", mode: "cors" },
-        1500,
-      );
+      await fetchWithTimeout(base + "/session/" + encodeURIComponent(sid) + "/abort", { method: "POST", mode: "cors" }, 1500);
     } catch {}
   }
-
-  stopBtn.addEventListener("click", () => {
-    abortRemote();
-  });
+  stopBtn.addEventListener("click", () => { abortRemote(); });
   document.addEventListener("keydown", (ev) => {
     if (ev.key === "Escape") abortRemote();
   });
-
   loadSessions();
   renderSessions();
   renderLog();
