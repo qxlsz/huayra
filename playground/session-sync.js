@@ -47,6 +47,24 @@ window.HuayraSessionSync = (function () {
       return [];
     }
   }
+  async function renameRemoteSession(opencodeUrl, remoteId, title, fetchWithTimeout) {
+    if (!remoteId || !title) return false;
+    try {
+      const res = await fetchWithTimeout(
+        opencodeUrl + "/session/" + encodeURIComponent(remoteId),
+        {
+          method: "PATCH",
+          mode: "cors",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ title: String(title) }),
+        },
+        1500
+      );
+      return Boolean(res && res.ok);
+    } catch {
+      return false;
+    }
+  }
   async function deleteRemoteSession(opencodeUrl, remoteId, fetchWithTimeout) {
     if (!remoteId) return false;
     try {
@@ -60,5 +78,5 @@ window.HuayraSessionSync = (function () {
       return false;
     }
   }
-  return { listRemoteSessions, fetchRemoteMessages, deleteRemoteSession };
+  return { listRemoteSessions, fetchRemoteMessages, renameRemoteSession, deleteRemoteSession };
 })();

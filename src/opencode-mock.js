@@ -10,7 +10,7 @@ function json(res, status, body) {
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": "*",
-    "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+    "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "access-control-allow-headers": "content-type, accept",
   });
   res.end(payload);
@@ -19,7 +19,7 @@ function json(res, status, body) {
 function corsPreflight(res) {
   res.writeHead(204, {
     "access-control-allow-origin": "*",
-    "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+    "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "access-control-allow-headers": "content-type, accept",
     "access-control-max-age": "86400",
   });
@@ -217,6 +217,36 @@ export function createOpenCodeMock() {
     }
 
     const sessionOne = path.match(/^\/session\/([^/]+)$/);
+    if (sessionOne && method === "GET") {
+      const sid = decodeURIComponent(sessionOne[1]);
+      const s = sessions.get(sid);
+      if (!s) {
+        json(res, 404, { error: "session not found" });
+        return true;
+      }
+      json(res, 200, { id: s.id, title: s.title });
+      return true;
+    }
+    if (sessionOne && method === "PATCH") {
+      const sid = decodeURIComponent(sessionOne[1]);
+      const s = sessions.get(sid);
+      if (!s) {
+        json(res, 404, { error: "session not found" });
+        return true;
+      }
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+      });
+      req.on("end", () => {
+        try {
+          const parsed = JSON.parse(body || "{}");
+          if (parsed?.title) s.title = String(parsed.title);
+        } catch {}
+        json(res, 200, { id: s.id, title: s.title });
+      });
+      return true;
+    }
     if (sessionOne && method === "DELETE") {
       const sid = decodeURIComponent(sessionOne[1]);
       const existed = sessions.delete(sid);

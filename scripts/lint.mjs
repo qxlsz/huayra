@@ -42,7 +42,7 @@ for (const file of files.sort()) {
 }
 
 const consoleSrc = await readFile(join("playground", "app.js"), "utf8");
-if (consoleSrc.includes("DecompressionStream") || consoleSrc.includes("(0, eval)")) {
+ if (consoleSrc.includes("DecompressionStream") || consoleSrc.includes("(0, eval)")) {
   failed += 1;
   process.stderr.write("playground/app.js must stay plain JS (no gzip eval loader)\n");
 }
@@ -71,6 +71,11 @@ if (!consoleSrc.includes("function abortRemote") || !consoleSrc.includes("/abort
 if (!consoleSrc.includes("function closeActiveSession") || !consoleSrc.includes("deleteRemoteSession")) {
   failed += 1;
   process.stderr.write("playground/app.js missing session index close\n");
+}
+const syncSrc = await readFile(join("playground", "session-sync.js"), "utf8");
+if (!syncSrc.includes("renameRemoteSession") || !consoleSrc.includes("renameRemoteSession")) {
+  failed += 1;
+  process.stderr.write("session index missing remote rename (PATCH title)\n");
 }
 
 if (failed > 0) {
