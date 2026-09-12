@@ -68,6 +68,10 @@ if (!consoleSrc.includes("function abortRemote") || !consoleSrc.includes("/abort
   failed += 1;
   process.stderr.write("playground/app.js missing OpenCode session abort\n");
 }
+if (!consoleSrc.includes("function closeActiveSession") || !consoleSrc.includes("deleteRemoteSession")) {
+  failed += 1;
+  process.stderr.write("playground/app.js missing session index close\n");
+}
 
 if (failed > 0) {
   process.exit(1);

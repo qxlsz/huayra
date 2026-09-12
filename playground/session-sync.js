@@ -47,5 +47,18 @@ window.HuayraSessionSync = (function () {
       return [];
     }
   }
-  return { listRemoteSessions, fetchRemoteMessages };
+  async function deleteRemoteSession(opencodeUrl, remoteId, fetchWithTimeout) {
+    if (!remoteId) return false;
+    try {
+      const res = await fetchWithTimeout(
+        opencodeUrl + "/session/" + encodeURIComponent(remoteId),
+        { method: "DELETE", mode: "cors" },
+        1500
+      );
+      return Boolean(res && res.ok);
+    } catch {
+      return false;
+    }
+  }
+  return { listRemoteSessions, fetchRemoteMessages, deleteRemoteSession };
 })();
