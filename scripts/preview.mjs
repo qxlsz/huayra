@@ -2,6 +2,7 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHostGateHandler, GATE_PATH } from "../src/host-gate-http.js";
 import { createOpenCodeMock, OPENCODE_MOCK_PREFIX } from "../src/opencode-mock.js";
 import { previewListen, safeDistFile } from "../src/preview.js";
 
@@ -9,6 +10,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = resolve(root, "dist");
 const { host, port } = previewListen(process.argv);
 const mock = createOpenCodeMock();
+const gate = createHostGateHandler(process.env);
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -24,6 +26,16 @@ const TYPES = {
 const server = createServer((req, res) => {
   const url = req.url || "/";
   const pathOnly = url.split("?")[0] || "/";
+
+  if (pathOnly === GATE_PATH || pathOnly === GATE_PATH + "/") {
+    gate.handle(req, res, GATE_PATH).then((handled) => {
+      if (!handled) {
+        res.writeHead(404, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ error: "not found" }));
+      }
+    });
+    return;
+  }
 
   if (pathOnly === OPENCODE_MOCK_PREFIX || pathOnly.startsWith(OPENCODE_MOCK_PREFIX + "/")) {
     const sub =

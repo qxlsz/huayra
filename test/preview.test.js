@@ -84,4 +84,9 @@ test("preview serves the playground and blocks path traversal", async (t) => {
   const gif = await fetch(`http://127.0.0.1:${port}/assets/guardian.gif`);
   assert.equal(gif.status, 200);
   assert.match(gif.headers.get("content-type") || "", /image\/gif/);
+
+  const gate = await fetch(`http://127.0.0.1:${port}/__gate`);
+  assert.equal(gate.status, 200);
+  const gateBody = await gate.json();
+  assert.equal(gateBody.required, false);
 });

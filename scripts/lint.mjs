@@ -81,6 +81,10 @@ if (!consoleSrc.includes("function autoTitleFromPrompt") || !consoleSrc.includes
   failed += 1;
   process.stderr.write("playground/app.js missing first-prompt Session Index auto-title\n");
 }
+if (!consoleSrc.includes("function probeHostGate") || !consoleSrc.includes("showGateAfterPaint")) {
+  failed += 1;
+  process.stderr.write("playground/app.js host gate must paint first then overlay\n");
+}
 
 if (failed > 0) {
   process.exit(1);
