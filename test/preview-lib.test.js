@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { parseFlag, previewListen, safeDistFile } from "../src/preview.js";
+import { parseFlag, previewListen, resolvePreviewFile, safeDistFile } from "../src/preview.js";
 
 test("preview listen flags default to the Docker host port", () => {
   assert.deepEqual(previewListen(["node", "preview.mjs"]), { host: "127.0.0.1", port: 8080 });
@@ -24,4 +24,17 @@ test("safeDistFile serves index and blocks traversal", () => {
   assert.equal(safeDistFile(dist, "/../package.json"), null);
   assert.equal(safeDistFile(dist, "/%2e%2e/package.json"), null);
   assert.equal(safeDistFile(dist, "/%"), null);
+});
+
+test("resolvePreviewFile falls back to playground when dist is empty", () => {
+  const dist = mkdtempSync(join(tmpdir(), "huayra-dist-empty-"));
+  const play = mkdtempSync(join(tmpdir(), "huayra-play-"));
+  writeFileSync(join(play, "index.html"), "<html>playground</html>");
+  writeFileSync(join(play, "app.js"), "function probeOpenCode() {}");
+
+  const index = resolvePreviewFile(dist, play, "/");
+  assert.equal(index.file, join(play, "index.html"));
+  const app = resolvePreviewFile(dist, play, "/app.js");
+  assert.equal(app.file, join(play, "app.js"));
+  assert.equal(resolvePreviewFile(dist, play, "/../package.json"), null);
 });

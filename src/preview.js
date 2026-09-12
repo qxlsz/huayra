@@ -1,3 +1,4 @@
+import { existsSync, statSync } from "node:fs";
 import { normalize, relative, resolve } from "node:path";
 
 export function parseFlag(argv, name, fallback) {
@@ -30,4 +31,17 @@ export function safeDistFile(distRoot, urlPath) {
     return null;
   }
   return candidate;
+}
+
+function existingFile(path) {
+  return Boolean(path && existsSync(path) && statSync(path).isFile());
+}
+
+/** Prefer dist, then playground so first paint works before `npm run build`. */
+export function resolvePreviewFile(distRoot, playgroundRoot, urlPath) {
+  const distFile = safeDistFile(distRoot, urlPath);
+  if (existingFile(distFile)) return { root: distRoot, file: distFile };
+  const playFile = safeDistFile(playgroundRoot, urlPath);
+  if (existingFile(playFile)) return { root: playgroundRoot, file: playFile };
+  return null;
 }

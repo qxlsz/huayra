@@ -85,6 +85,11 @@ if (!consoleSrc.includes("function probeHostGate") || !consoleSrc.includes("show
   failed += 1;
   process.stderr.write("playground/app.js host gate must paint first then overlay\n");
 }
+const previewLib = await readFile(join("src", "preview.js"), "utf8");
+if (!previewLib.includes("function resolvePreviewFile") || !previewLib.includes("playgroundRoot")) {
+  failed += 1;
+  process.stderr.write("src/preview.js must fall back to playground when dist is empty\n");
+}
 
 if (failed > 0) {
   process.exit(1);

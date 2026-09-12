@@ -4,10 +4,11 @@ import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHostGateHandler, GATE_PATH } from "../src/host-gate-http.js";
 import { createOpenCodeMock, OPENCODE_MOCK_PREFIX } from "../src/opencode-mock.js";
-import { previewListen, safeDistFile } from "../src/preview.js";
+import { previewListen, resolvePreviewFile } from "../src/preview.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = resolve(root, "dist");
+const playground = resolve(root, "playground");
 const { host, port } = previewListen(process.argv);
 const mock = createOpenCodeMock();
 const gate = createHostGateHandler(process.env);
@@ -51,7 +52,8 @@ const server = createServer((req, res) => {
     return;
   }
 
-  const file = safeDistFile(dist, url);
+  const resolved = resolvePreviewFile(dist, playground, url);
+  const file = resolved && resolved.file;
   if (!file || !existsSync(file) || !statSync(file).isFile()) {
     res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
     res.end("not found\n");
