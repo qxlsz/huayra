@@ -35,6 +35,24 @@ async function waitForOutput(child, needle, timeoutMs = 5000) {
   throw new Error("preview startup timeout");
 }
 
+test("preview writes mascot GIFs without a prior build", async (t) => {
+  const port = await freePort();
+  const preview = spawn(process.execPath, ["scripts/preview.mjs", "--host", "127.0.0.1", "--port", String(port)], {
+    cwd: root,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  t.after(() => {
+    preview.kill("SIGTERM");
+  });
+  await waitForOutput(preview, `http://127.0.0.1:${port}`);
+
+  const gif = await fetch(`http://127.0.0.1:${port}/assets/guardian.gif`);
+  assert.equal(gif.status, 200);
+  assert.match(gif.headers.get("content-type") || "", /image\/gif/);
+  const busy = await fetch(`http://127.0.0.1:${port}/assets/templar-busy.gif`);
+  assert.equal(busy.status, 200);
+});
+
 test("preview serves the playground and blocks path traversal", async (t) => {
   const build = spawn(process.execPath, ["scripts/build.mjs"], { cwd: root, stdio: "inherit" });
   const [buildCode] = await once(build, "exit");

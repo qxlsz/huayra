@@ -90,6 +90,11 @@ if (!previewLib.includes("function resolvePreviewFile") || !previewLib.includes(
   failed += 1;
   process.stderr.write("src/preview.js must fall back to playground when dist is empty\n");
 }
+const previewSrc = await readFile(join("scripts", "preview.mjs"), "utf8");
+if (!previewSrc.includes("writeMascotGifs") || !previewSrc.includes("playground") || !previewSrc.includes("assets")) {
+  failed += 1;
+  process.stderr.write("scripts/preview.mjs must write Guardian/Templar GIFs before listen\n");
+}
 
 if (failed > 0) {
   process.exit(1);

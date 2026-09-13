@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { createHostGateHandler, GATE_PATH } from "../src/host-gate-http.js";
 import { createOpenCodeMock, OPENCODE_MOCK_PREFIX } from "../src/opencode-mock.js";
 import { previewListen, resolvePreviewFile } from "../src/preview.js";
+import { writeMascotGifs } from "./mascot-gifs.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = resolve(root, "dist");
@@ -12,6 +13,8 @@ const playground = resolve(root, "playground");
 const { host, port } = previewListen(process.argv);
 const mock = createOpenCodeMock();
 const gate = createHostGateHandler(process.env);
+
+await writeMascotGifs(join(playground, "assets"));
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",
