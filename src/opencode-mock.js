@@ -203,6 +203,17 @@ export function createOpenCodeMock() {
         });
         const tokens = ["mock reply: ", ...snippet.split(/(\s+)/).filter((t) => t.length > 0)];
         const partId = "prt_" + sid.slice(-8);
+        if (current.thinking && current.thinking !== "idle") {
+          const reason = {
+            type: "message.part.updated",
+            part: {
+              id: "thk_" + sid.slice(-8),
+              type: "reasoning",
+              text: "thinking " + current.thinking + " on " + snippet.slice(0, 48),
+            },
+          };
+          res.write(`data: ${JSON.stringify(reason)}\n\n`);
+        }
         for (const token of tokens) {
           if (s.aborted) break;
           const evt = {
