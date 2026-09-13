@@ -174,4 +174,23 @@ test("preview mounts OpenCode mock under /__opencode", async (t) => {
     .join("");
   assert.match(joined, /hello mock/);
   assert.ok((streamText.match(/^data:/gm) || []).length >= 3, "expected multi-chunk SSE");
+
+  const setThink = await fetch(`http://127.0.0.1:${port}${OPENCODE_MOCK_PREFIX}/agent`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ thinking: "high" }),
+  });
+  assert.equal(setThink.status, 200);
+
+  const thinkPrompt = await fetch(
+    `http://127.0.0.1:${port}${OPENCODE_MOCK_PREFIX}/session/${encodeURIComponent(sess.id)}/prompt`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "text/event-stream" },
+      body: JSON.stringify({ parts: [{ type: "text", text: "plan it" }], thinking: "high" }),
+    },
+  );
+  const thinkStream = await thinkPrompt.text();
+  assert.match(thinkStream, /"type":"reasoning"/);
+  assert.match(thinkStream, /thinking high/);
 });

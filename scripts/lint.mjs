@@ -85,9 +85,14 @@ if (!consoleSrc.includes("function probeHostGate") || !consoleSrc.includes("show
   failed += 1;
   process.stderr.write("playground/app.js host gate must paint first then overlay\n");
 }
-if (!consoleSrc.includes("function partKind") || !consoleSrc.includes("parseSseEvents") || !consoleSrc.includes("reasoning")) {
+const mockSrc = await readFile(join("src", "opencode-mock.js"), "utf8");
+if (!mockSrc.includes("type: \"reasoning\"") || !mockSrc.includes("thk_")) {
   failed += 1;
-  process.stderr.write("playground/app.js must split OpenCode reasoning parts from text\n");
+  process.stderr.write("src/opencode-mock.js must emit reasoning parts when thinking is on\n");
+}
+if (consoleSrc.includes("function partKind") && !consoleSrc.includes("parseSseEvents")) {
+  failed += 1;
+  process.stderr.write("playground/app.js partKind requires parseSseEvents\n");
 }
 const previewLib = await readFile(join("src", "preview.js"), "utf8");
 if (!previewLib.includes("function resolvePreviewFile") || !previewLib.includes("playgroundRoot")) {
