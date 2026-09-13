@@ -94,6 +94,11 @@ if (!consoleSrc.includes("function partKind") || !consoleSrc.includes("function 
   failed += 1;
   process.stderr.write("playground/app.js must split reasoning SSE from assistant text\n");
 }
+const sseSrc = await readFile(join("playground", "sse.js"), "utf8");
+if (!sseSrc.includes("function partKind") || !sseSrc.includes("reasoning")) {
+  failed += 1;
+  process.stderr.write("playground/sse.js must classify OpenCode reasoning parts\n");
+}
 const previewLib = await readFile(join("src", "preview.js"), "utf8");
 if (!previewLib.includes("function resolvePreviewFile") || !previewLib.includes("playgroundRoot")) {
   failed += 1;
