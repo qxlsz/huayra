@@ -14,6 +14,7 @@ await writeMascotGifs(join(dist, "assets"));
 await copyFile(join(playground, "index.html"), join(dist, "index.html"));
 await copyFile(join(playground, "app.js"), join(dist, "app.js"));
 await copyFile(join(playground, "session-sync.js"), join(dist, "session-sync.js"));
+await copyFile(join(playground, "sse.js"), join(dist, "sse.js"));
 for (const name of await readdir(playground)) {
   if (name === "index.html" || name === "app.js" || name === "session-sync.js") continue;
   if (name.endsWith(".js") || name.endsWith(".css") || name.endsWith(".svg") || name.endsWith(".gif")) {
