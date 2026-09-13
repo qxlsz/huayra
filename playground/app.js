@@ -384,35 +384,15 @@
       return null;
     }
   }
-  let sseBuf = "";
-  function textFromPartEvent(obj) {
-    if (obj == null) return "";
-    if (typeof obj === "string") return obj;
-    if (typeof obj.text === "string") return obj.text;
-    if (obj.delta && typeof obj.delta.text === "string") return obj.delta.text;
-    if (obj.part && typeof obj.part.text === "string") return obj.part.text;
-    if (obj.properties && obj.properties.part && typeof obj.properties.part.text === "string") {
-      return obj.properties.part.text;
-    }
-    return "";
+  function sseApi() {
+    return window.HuayraSse || null;
   }
-  function parseSseText(chunk, flush) {
-    sseBuf += String(chunk || "");
-    let out = "";
-    const blocks = sseBuf.split("\n\n");
-    sseBuf = flush ? "" : (blocks.pop() || "");
-    for (const block of blocks) {
-      const line = block.split("\n").find((l) => l.startsWith("data:"));
-      if (!line) continue;
-      const payload = line.slice(5).trim();
-      if (!payload || payload === "[DONE]") continue;
-      try {
-        out += textFromPartEvent(JSON.parse(payload));
-      } catch {
-        out += payload;
-      }
+  function consumeSse(chunk, flush) {
+    const api = sseApi();
+    if (api && typeof api.parseSseEvents === "function") {
+      return api.parseSseEvents(chunk, flush);
     }
-    return out;
+    return [];
   }
   async function sendPrompt(text) {
     appendLine("user", text);
@@ -434,6 +414,9 @@
     stopBtn.classList.add("visible");
     const ctrl = new AbortController();
     state.abort = ctrl;
+    const thinkEl = document.createElement("p");
+    thinkEl.className = "line think";
+    thinkEl.textContent = "";
     const assistant = document.createElement("p");
     assistant.className = "line assistant";
     assistant.textContent = "";
@@ -449,30 +432,50 @@
       if (!res.ok || !res.body) {
         appendLine("err", "prompt failed (" + res.status + ")");
         assistant.remove();
+        thinkEl.remove();
         return;
       }
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let acc = "";
-      sseBuf = "";
+      let thinkAcc = "";
+      const api = sseApi();
+      if (api && api.reset) api.reset();
+      function applyEvents(events) {
+        for (const ev of events) {
+          if (!ev || !ev.text) continue;
+          if (ev.kind === "think") {
+            thinkAcc += ev.text;
+            thinkEl.textContent = thinkAcc;
+            if (!thinkEl.isConnected) logEl.insertBefore(thinkEl, assistant);
+          } else {
+            acc += ev.text;
+            assistant.textContent = acc;
+          }
+        }
+        logEl.scrollTop = logEl.scrollHeight;
+      }
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          acc += parseSseText(dec.decode(), true);
+          applyEvents(consumeSse(dec.decode(), true));
           break;
         }
-        acc += parseSseText(dec.decode(value, { stream: true }), false);
-        assistant.textContent = acc;
-        logEl.scrollTop = logEl.scrollHeight;
+        applyEvents(consumeSse(dec.decode(value, { stream: true }), false));
       }
-      if (acc) assistant.textContent = acc;
+      const sess = activeSession();
+      if (thinkAcc) {
+        sess.lines.push({ cls: "think", text: thinkAcc });
+      } else if (thinkEl.isConnected) {
+        thinkEl.remove();
+      }
       if (acc) {
-        activeSession().lines.push({ cls: "assistant", text: acc });
-        saveSessions();
+        sess.lines.push({ cls: "assistant", text: acc });
       } else {
         assistant.remove();
-        appendLine("err", "empty reply");
+        if (!thinkAcc) appendLine("err", "empty reply");
       }
+      if (thinkAcc || acc) saveSessions();
     } catch (err) {
       assistant.remove();
       if (err && err.name === "AbortError") appendLine("sys", "stopped");
