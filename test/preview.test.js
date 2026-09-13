@@ -100,6 +100,7 @@ test("preview serves the playground and blocks path traversal", async (t) => {
   assert.match(js, /HuayraSse/);
   assert.match(js, /parseSseEvents/);
   assert.match(js, /line think/);
+  assert.match(js, /__live/);
   assert.doesNotMatch(js, /DecompressionStream/);
 
   const gif = await fetch(`http://127.0.0.1:${port}/assets/guardian.gif`);

@@ -113,6 +113,14 @@ if (!previewSrc.includes("writeMascotGifs") || !previewSrc.includes("playground"
   failed += 1;
   process.stderr.write("scripts/preview.mjs must write Guardian/Templar GIFs before listen\n");
 }
+if (!previewSrc.includes("OPENCODE_LIVE_PREFIX") || !previewSrc.includes("createOpenCodeLiveProxy")) {
+  failed += 1;
+  process.stderr.write("scripts/preview.mjs must mount /__live OpenCode proxy\n");
+}
+if (!consoleSrc.includes("LIVE_PROXY") || !consoleSrc.includes("/__live")) {
+  failed += 1;
+  process.stderr.write("playground/app.js must probe same-origin /__live for OpenCode attach\n");
+}
 
 if (failed > 0) {
   process.exit(1);
