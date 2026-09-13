@@ -4,6 +4,7 @@ import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHostGateHandler, GATE_PATH } from "../src/host-gate-http.js";
 import { createOpenCodeMock, OPENCODE_MOCK_PREFIX } from "../src/opencode-mock.js";
+import { createOpenCodeLiveProxy, OPENCODE_LIVE_PREFIX } from "../src/opencode-proxy.js";
 import { previewListen, resolvePreviewFile } from "../src/preview.js";
 import { writeMascotGifs } from "./mascot-gifs.mjs";
 
@@ -12,6 +13,7 @@ const dist = resolve(root, "dist");
 const playground = resolve(root, "playground");
 const { host, port } = previewListen(process.argv);
 const mock = createOpenCodeMock();
+const live = createOpenCodeLiveProxy(process.env);
 const gate = createHostGateHandler(process.env);
 
 await writeMascotGifs(join(playground, "assets"));
@@ -38,6 +40,24 @@ const server = createServer((req, res) => {
         res.end(JSON.stringify({ error: "not found" }));
       }
     });
+    return;
+  }
+
+  if (pathOnly === OPENCODE_LIVE_PREFIX || pathOnly.startsWith(OPENCODE_LIVE_PREFIX + "/")) {
+    const sub =
+      pathOnly === OPENCODE_LIVE_PREFIX
+        ? "/"
+        : pathOnly.slice(OPENCODE_LIVE_PREFIX.length) || "/";
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
+        "access-control-allow-headers": "content-type, accept",
+      });
+      res.end();
+      return;
+    }
+    live.handle(req, res, sub);
     return;
   }
 
@@ -69,4 +89,5 @@ const server = createServer((req, res) => {
 server.listen(port, host, () => {
   process.stdout.write(`huayra preview http://${host}:${port}\n`);
   process.stdout.write(`opencode mock  http://${host}:${port}${OPENCODE_MOCK_PREFIX}\n`);
+  process.stdout.write(`opencode live  http://${host}:${port}${OPENCODE_LIVE_PREFIX} -> ${live.targetBase}\n`);
 });
