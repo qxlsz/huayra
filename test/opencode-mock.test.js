@@ -159,6 +159,7 @@ test("preview mounts OpenCode mock under /__opencode", async (t) => {
   assert.equal(prompt.status, 200);
   const streamText = await prompt.text();
   assert.match(streamText, /mock reply/);
+  assert.match(streamText, /message\.part\.updated/);
   const joined = streamText
     .split("\n")
     .map((l) => l.trim())

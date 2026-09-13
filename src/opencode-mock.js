@@ -193,6 +193,7 @@ export function createOpenCodeMock() {
         const snippet = userText.slice(0, 200);
         const reply = `mock reply [${current.agent}/${current.model}]: ${snippet}`;
         s.messages.push({ role: "assistant", text: reply });
+        s.aborted = false;
 
         res.writeHead(200, {
           "content-type": "text/event-stream; charset=utf-8",
@@ -201,8 +202,18 @@ export function createOpenCodeMock() {
           connection: "keep-alive",
         });
         const tokens = ["mock reply: ", ...snippet.split(/(\s+)/).filter((t) => t.length > 0)];
+        const partId = "prt_" + sid.slice(-8);
         for (const token of tokens) {
-          res.write(`data: ${JSON.stringify({ text: token })}\n\n`);
+          if (s.aborted) break;
+          const evt = {
+            type: "message.part.updated",
+            part: { id: partId, type: "text", text: token },
+            text: token,
+          };
+          res.write(`data: ${JSON.stringify(evt)}\n\n`);
+        }
+        if (s.aborted) {
+          res.write(`data: ${JSON.stringify({ type: "session.idle", aborted: true })}\n\n`);
         }
         res.write("data: [DONE]\n\n");
         res.end();
@@ -212,7 +223,10 @@ export function createOpenCodeMock() {
 
     const abortMatch = path.match(/^\/session\/([^/]+)\/abort$/);
     if (abortMatch && method === "POST") {
-      json(res, 200, { ok: true });
+      const sid = decodeURIComponent(abortMatch[1]);
+      const s = sessions.get(sid);
+      if (s) s.aborted = true;
+      json(res, 200, { ok: true, id: sid });
       return true;
     }
 
