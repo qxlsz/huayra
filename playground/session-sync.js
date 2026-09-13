@@ -34,7 +34,16 @@ window.HuayraSessionSync = (function () {
         let text = "";
         if (typeof parts === "string") text = parts;
         else if (Array.isArray(parts)) {
-          text = parts.map((p) => p?.text || p?.content || "").filter(Boolean).join("\n");
+          const thinkBits = parts
+            .filter((p) => p && (p.type === "reasoning" || p.type === "thinking" || p.type === "think"))
+            .map((p) => p.text || p.content || "")
+            .filter(Boolean);
+          const textBits = parts
+            .filter((p) => !p || (p.type !== "reasoning" && p.type !== "thinking" && p.type !== "think"))
+            .map((p) => p?.text || p?.content || "")
+            .filter(Boolean);
+          if (thinkBits.length) out.push({ cls: "think", text: thinkBits.join("\n") });
+          text = textBits.join("\n");
         } else if (row?.text) text = row.text;
         text = String(text || "").trim();
         if (!text) continue;

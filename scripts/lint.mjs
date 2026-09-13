@@ -90,9 +90,9 @@ if (!mockSrc.includes("type: \"reasoning\"") || !mockSrc.includes("thk_")) {
   failed += 1;
   process.stderr.write("src/opencode-mock.js must emit reasoning parts when thinking is on\n");
 }
-if (consoleSrc.includes("function partKind") && !consoleSrc.includes("parseSseEvents")) {
+if (!consoleSrc.includes("function partKind") || !consoleSrc.includes("function parseSseEvents")) {
   failed += 1;
-  process.stderr.write("playground/app.js partKind requires parseSseEvents\n");
+  process.stderr.write("playground/app.js must split reasoning SSE from assistant text\n");
 }
 const previewLib = await readFile(join("src", "preview.js"), "utf8");
 if (!previewLib.includes("function resolvePreviewFile") || !previewLib.includes("playgroundRoot")) {
