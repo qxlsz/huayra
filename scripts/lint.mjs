@@ -90,14 +90,14 @@ if (!mockSrc.includes("type: \"reasoning\"") || !mockSrc.includes("thk_")) {
   failed += 1;
   process.stderr.write("src/opencode-mock.js must emit reasoning parts when thinking is on\n");
 }
-if (!consoleSrc.includes("function partKind") || !consoleSrc.includes("function parseSseEvents")) {
-  failed += 1;
-  process.stderr.write("playground/app.js must split reasoning SSE from assistant text\n");
-}
 const sseSrc = await readFile(join("playground", "sse.js"), "utf8");
-if (!sseSrc.includes("function partKind") || !sseSrc.includes("reasoning")) {
+if (!sseSrc.includes("function partKind") || !sseSrc.includes("reasoning") || !sseSrc.includes("parseSseEvents")) {
   failed += 1;
   process.stderr.write("playground/sse.js must classify OpenCode reasoning parts\n");
+}
+if (!playgroundHtml.includes("./sse.js")) {
+  failed += 1;
+  process.stderr.write("playground/index.html must load sse.js\n");
 }
 const previewLib = await readFile(join("src", "preview.js"), "utf8");
 if (!previewLib.includes("function resolvePreviewFile") || !previewLib.includes("playgroundRoot")) {
