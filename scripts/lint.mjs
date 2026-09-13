@@ -85,6 +85,10 @@ if (!consoleSrc.includes("function probeHostGate") || !consoleSrc.includes("show
   failed += 1;
   process.stderr.write("playground/app.js host gate must paint first then overlay\n");
 }
+if (!consoleSrc.includes("function partKind") || !consoleSrc.includes("parseSseEvents") || !consoleSrc.includes("reasoning")) {
+  failed += 1;
+  process.stderr.write("playground/app.js must split OpenCode reasoning parts from text\n");
+}
 const previewLib = await readFile(join("src", "preview.js"), "utf8");
 if (!previewLib.includes("function resolvePreviewFile") || !previewLib.includes("playgroundRoot")) {
   failed += 1;
