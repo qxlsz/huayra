@@ -193,4 +193,14 @@ test("preview mounts OpenCode mock under /__opencode", async (t) => {
   const thinkStream = await thinkPrompt.text();
   assert.match(thinkStream, /"type":"reasoning"/);
   assert.match(thinkStream, /thinking high/);
+
+  const stored = await fetch(
+    `http://127.0.0.1:${port}${OPENCODE_MOCK_PREFIX}/session/${encodeURIComponent(sess.id)}/message`,
+  );
+  assert.equal(stored.status, 200);
+  const rows = await stored.json();
+  const last = rows[rows.length - 1];
+  assert.equal(last.info.role, "assistant");
+  assert.equal(last.parts.some((p) => p.type === "reasoning" && /thinking high/.test(p.text)), true);
+  assert.equal(last.parts.some((p) => p.type === "text"), true);
 });
