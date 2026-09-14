@@ -48,7 +48,7 @@ export function createOpenCodeMock() {
         role: "assistant",
         parts: [
           { type: "reasoning", text: "pick the live session list" },
-          { type: "text", text: "mock reply: session index is live" },
+          { type: "text", text: "session index is live" },
         ],
       },
     ],
@@ -98,6 +98,7 @@ export function createOpenCodeMock() {
         name: current.agent,
         id: current.agent,
         model: current.model,
+        thinking: current.thinking,
         provider: "opencode-mock",
         agents,
       });
@@ -122,6 +123,7 @@ export function createOpenCodeMock() {
           name: current.agent,
           id: current.agent,
           model: current.model,
+          thinking: current.thinking,
           provider: "opencode-mock",
           agents,
         });
@@ -211,7 +213,7 @@ export function createOpenCodeMock() {
         } catch {}
         userText = String(userText || "").trim() || "(empty)";
         const snippet = userText.slice(0, 200);
-        const reply = `mock reply [${current.agent}/${current.model}]: ${snippet}`;
+        const reply = `[${current.agent}/${current.model}] ${snippet}`;
         const reasonText =
           current.thinking && current.thinking !== "idle"
             ? "thinking " + current.thinking + " on " + snippet.slice(0, 48)
@@ -237,7 +239,7 @@ export function createOpenCodeMock() {
           "cache-control": "no-cache",
           connection: "keep-alive",
         });
-        const tokens = ["mock reply: ", ...snippet.split(/(\s+)/).filter((t) => t.length > 0)];
+        const tokens = snippet.split(/(\s+)/).filter((t) => t.length > 0);
         const partId = "prt_" + sid.slice(-8);
         if (current.thinking && current.thinking !== "idle") {
           const reason = {

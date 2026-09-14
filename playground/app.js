@@ -178,22 +178,23 @@
         const shown = url.includes("/__live") ? "via preview proxy" : url.replace(/^https?:\/\//, "");
         label.textContent = "OpenCode " + shown;
       }
-      setDot("provider-dot", "ok");
-      setText("provider-label", "provider opencode");
-      state.provider = "opencode";
     } else if (kind === "mock") {
       setDot("opencode-dot", "warn");
       if (label) label.textContent = "OpenCode mock";
-      setDot("provider-dot", "warn");
-      setText("provider-label", "provider mock");
-      state.provider = "opencode";
     } else {
       setDot("opencode-dot", "err");
       if (label) label.textContent = "OpenCode offline";
-      setDot("provider-dot", "");
-      setText("provider-label", "provider none");
-      state.provider = "none";
     }
+    const provider = extra && extra.provider
+      ? String(extra.provider)
+      : kind === "live"
+        ? "opencode"
+        : kind === "mock"
+          ? "opencode-mock"
+          : "none";
+    state.provider = provider;
+    setText("provider-label", "provider " + provider);
+    setDot("provider-dot", kind === "live" ? "ok" : kind === "mock" ? "warn" : "");
     if (extra && extra.agent) {
       state.agent = extra.agent;
       setText("agent-label", "agent");
@@ -250,7 +251,9 @@
       if (!agents.includes(agent)) agents.unshift(agent);
       if (!model || model === "-") model = models[0] || model || "-";
       if (model && model !== "-" && !models.includes(model)) models.unshift(model);
-      return { agent, model, agents, models };
+      const provider = (row && (row.provider || row.owned_by)) || (data && data.provider) || "";
+      const thinking = (row && row.thinking) || (data && data.thinking) || "";
+      return { agent, model, agents, models, provider, thinking };
     } catch {
       return {};
     }
@@ -290,9 +293,13 @@
     if (extra.models) state.models = extra.models;
     fillSelect(agentSel, state.agents.length ? state.agents : extra.agent ? [extra.agent] : [], extra.agent || state.agent);
     fillSelect(modelSel, state.models.length ? state.models : extra.model ? [extra.model] : [], extra.model || state.model);
+    if (extra.thinking && extra.thinking !== "run" && extra.thinking !== "wait") {
+      state.thinking = extra.thinking;
+    }
     if (thinkSel && state.thinking) thinkSel.value = state.thinking === "run" || state.thinking === "wait" ? "medium" : state.thinking;
     if (extra.agent && extra.agent !== "-") localStorage.setItem("huayra.agent", extra.agent);
     if (extra.model && extra.model !== "-") localStorage.setItem("huayra.model", extra.model);
+    if (state.thinking) localStorage.setItem("huayra.thinking", state.thinking);
   }
   async function pushAgentChoice() {
     const base = state.attachedUrl;
