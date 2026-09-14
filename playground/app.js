@@ -30,6 +30,8 @@
     agents: [],
     models: [],
     mascot: localStorage.getItem("huayra.mascot") || "guardian",
+    promptDraft: "",
+    promptCursor: -1,
   };
   function loadSessions() {
     try {
@@ -729,17 +731,50 @@
       pushAgentChoice();
     });
   }
+  function promptHistory() {
+    const fromSess = activeSession().lines
+      .filter((line) => line && line.cls === "user" && line.text)
+      .map((line) => line.text);
+    return fromSess;
+  }
+  function applyPromptHistory(delta) {
+    const hist = promptHistory();
+    if (!hist.length) return;
+    if (state.promptCursor < 0) state.promptDraft = promptEl.value;
+    const next = state.promptCursor < 0
+      ? (delta < 0 ? hist.length - 1 : 0)
+      : state.promptCursor + delta;
+    if (next < 0 || next >= hist.length) {
+      state.promptCursor = -1;
+      promptEl.value = state.promptDraft;
+      return;
+    }
+    state.promptCursor = next;
+    promptEl.value = hist[next];
+  }
   form.addEventListener("submit", (ev) => {
     ev.preventDefault();
     const text = promptEl.value.trim();
     if (!text) return;
     promptEl.value = "";
+    state.promptCursor = -1;
+    state.promptDraft = "";
     sendPrompt(text);
   });
   promptEl.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" && !ev.shiftKey) {
       ev.preventDefault();
       form.requestSubmit();
+      return;
+    }
+    if (ev.key === "ArrowUp" && promptEl.selectionStart === 0 && promptEl.selectionEnd === 0) {
+      ev.preventDefault();
+      applyPromptHistory(-1);
+      return;
+    }
+    if (ev.key === "ArrowDown" && promptEl.selectionStart === promptEl.value.length) {
+      ev.preventDefault();
+      applyPromptHistory(1);
     }
   });
   async function abortRemote() {
@@ -754,6 +789,18 @@
   stopBtn.addEventListener("click", () => { abortRemote(); });
   document.addEventListener("keydown", (ev) => {
     if (ev.key === "Escape") abortRemote();
+    const meta = ev.ctrlKey || ev.metaKey;
+    if (!meta || ev.altKey) return;
+    if (ev.key === "n" || ev.key === "N") {
+      ev.preventDefault();
+      document.getElementById("session-new").click();
+    } else if (ev.key === "r" || ev.key === "R") {
+      ev.preventDefault();
+      document.getElementById("session-sync").click();
+    } else if (ev.key === "l" || ev.key === "L") {
+      ev.preventDefault();
+      promptEl.focus();
+    }
   });
   loadSessions();
   renderSessions();
