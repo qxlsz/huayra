@@ -129,6 +129,14 @@ if (!consoleSrc.includes("LIVE_PROXY") || !consoleSrc.includes("/__live")) {
   failed += 1;
   process.stderr.write("playground/app.js must probe same-origin /__live for OpenCode attach\n");
 }
+if (!consoleSrc.includes("extra.provider") || !consoleSrc.includes("extra.thinking")) {
+  failed += 1;
+  process.stderr.write("playground/app.js must paint provider and thinking from /agent\n");
+}
+if (!mockSrc.includes("thinking: current.thinking")) {
+  failed += 1;
+  process.stderr.write("src/opencode-mock.js GET /agent must return thinking\n");
+}
 
 if (failed > 0) {
   process.exit(1);

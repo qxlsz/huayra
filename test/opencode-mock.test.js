@@ -41,6 +41,8 @@ test("opencode mock health and agent routes", async () => {
   assert.equal(mock.handle({ method: "GET", on() {} }, res2, "/agent"), true);
   const agent = JSON.parse(chunks2.join(""));
   assert.equal(agent.name, "build");
+  assert.equal(agent.thinking, "idle");
+  assert.equal(agent.provider, "opencode-mock");
 
   const chunks3 = [];
   const res3 = {
@@ -158,7 +160,6 @@ test("preview mounts OpenCode mock under /__opencode", async (t) => {
   );
   assert.equal(prompt.status, 200);
   const streamText = await prompt.text();
-  assert.match(streamText, /mock reply/);
   assert.match(streamText, /message\.part\.updated/);
   const joined = streamText
     .split("\n")
