@@ -137,6 +137,10 @@ if (!consoleSrc.includes("extra.provider") || !consoleSrc.includes("extra.thinki
   failed += 1;
   process.stderr.write("playground/app.js must paint provider and thinking from /agent\n");
 }
+if (!consoleSrc.includes("function promptHistory") || !consoleSrc.includes("function applyPromptHistory")) {
+  failed += 1;
+  process.stderr.write("playground/app.js must walk user-line prompt history with Up/Down\n");
+}
 if (!mockSrc.includes("thinking: current.thinking")) {
   failed += 1;
   process.stderr.write("src/opencode-mock.js GET /agent must return thinking\n");
