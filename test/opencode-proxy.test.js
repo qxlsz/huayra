@@ -47,9 +47,32 @@ test("live proxy forwards health and SSE from a reachable serve", async (t) => {
   assert.equal(health.status, 200);
   const body = await health.json();
   assert.equal(body.healthy, true);
+  assert.equal(body.ok, true);
+  assert.equal(body.service, "opencode");
 
   const sse = await fetch(`http://127.0.0.1:${p}${OPENCODE_LIVE_PREFIX}/session/s1/prompt`, { method: "POST" });
   assert.equal(sse.status, 200);
   const text = await sse.text();
   assert.match(text, /\"text\":\"hi\"/);
+});
+
+test("live proxy health probe fails fast when serve is down", async (t) => {
+  const proxy = createOpenCodeLiveProxy({ OPENCODE_URL: "http://127.0.0.1:1" });
+  const server = createServer((req, res) => {
+    const path = (req.url || "/").split("?")[0];
+    const sub = path.slice(OPENCODE_LIVE_PREFIX.length) || "/";
+    proxy.handle(req, res, sub);
+  });
+  t.after(() => server.close());
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const p = server.address().port;
+  const started = Date.now();
+  const health = await fetch(`http://127.0.0.1:${p}${OPENCODE_LIVE_PREFIX}/global/health`);
+  const elapsed = Date.now() - started;
+  assert.equal(health.status, 502);
+  const body = await health.json();
+  assert.equal(body.ok, false);
+  assert.match(String(body.error || ""), /unreachable|timeout|unhealthy/);
+  assert.ok(elapsed < 2500, "probe should finish well under the 30s proxy timeout");
 });
