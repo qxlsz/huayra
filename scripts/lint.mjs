@@ -77,6 +77,10 @@ if (!syncSrc.includes("renameRemoteSession") || !consoleSrc.includes("renameRemo
   failed += 1;
   process.stderr.write("session index missing remote rename (PATCH title)\n");
 }
+if (!syncSrc.includes("p.type === \"reasoning\"") || !syncSrc.includes('cls: "think"')) {
+  failed += 1;
+  process.stderr.write("session-sync.js must restore think lines from reasoning parts\n");
+}
 if (!consoleSrc.includes("function autoTitleFromPrompt") || !consoleSrc.includes("function titleFromPrompt")) {
   failed += 1;
   process.stderr.write("playground/app.js missing first-prompt Session Index auto-title\n");
@@ -89,6 +93,10 @@ const mockSrc = await readFile(join("src", "opencode-mock.js"), "utf8");
 if (!mockSrc.includes("type: \"reasoning\"") || !mockSrc.includes("thk_")) {
   failed += 1;
   process.stderr.write("src/opencode-mock.js must emit reasoning parts when thinking is on\n");
+}
+if (!mockSrc.includes("info: { role:") || !mockSrc.includes('type: "reasoning", text: reasonText')) {
+  failed += 1;
+  process.stderr.write("src/opencode-mock.js must persist OpenCode-shaped messages with reasoning parts\n");
 }
 const sseSrc = await readFile(join("playground", "sse.js"), "utf8");
 if (!sseSrc.includes("function partKind") || !sseSrc.includes("reasoning") || !sseSrc.includes("parseSseEvents")) {
