@@ -97,10 +97,229 @@ export function createOpenCodeMock() {
       json(res, 200, {
         name: current.agent,
         id: current.agent,
-        model: current.agent === current.agent ? current.model : current.model,
         model: current.model,
         provider: "opencode-mock",
         agents,
       });
       return true;
     }
+
+    if (path === "/agent" && method === "POST") {
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+      });
+      req.on("end", () => {
+        try {
+          const parsed = JSON.parse(body || "{}");
+          if (parsed.agent || parsed.name || parsed.id) {
+            current.agent = String(parsed.agent || parsed.name || parsed.id);
+          }
+          if (parsed.model) current.model = String(parsed.model);
+          if (parsed.thinking) current.thinking = String(parsed.thinking);
+        } catch {}
+        json(res, 200, {
+          name: current.agent,
+          id: current.agent,
+          model: current.model,
+          provider: "opencode-mock",
+          agents,
+        });
+      });
+      return true;
+    }
+
+    if (path === "/session" && method === "GET") {
+      const list = [...sessions.values()].map((s) => ({ id: s.id, title: s.title }));
+      json(res, 200, list);
+      return true;
+    }
+
+    if (path === "/session" && method === "POST") {
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+      });
+      req.on("end", () => {
+        let title = "huayra";
+        try {
+          const parsed = JSON.parse(body || "{}");
+          if (parsed?.title) title = String(parsed.title);
+        } catch {}
+        const sid = id();
+        sessions.set(sid, { id: sid, title, messages: [] });
+        json(res, 200, { id: sid, title });
+      });
+      return true;
+    }
+
+    const msgMatch = path.match(/^\/session\/([^/]+)\/message$/);
+    if (msgMatch && method === "GET") {
+      const s = sessions.get(decodeURIComponent(msgMatch[1]));
+      if (!s) {
+        json(res, 404, { error: "session not found" });
+        return true;
+      }
+      json(
+        res,
+        200,
+        s.messages.map((m) => {
+          if (m && Array.isArray(m.parts)) {
+            return {
+              info: m.info || { role: m.role },
+              role: m.role,
+              parts: m.parts,
+            };
+          }
+          return {
+            info: { role: m.role },
+            role: m.role,
+            parts: [{ type: "text", text: m.text || "" }],
+          };
+        }),
+      );
+      return true;
+    }
+
+    const promptMatch = path.match(/^\/session\/([^/]+)\/prompt$/);
+    const messagePostMatch = path.match(/^\/session\/([^/]+)\/message$/);
+    if ((promptMatch || messagePostMatch) && method === "POST") {
+      const sid = decodeURIComponent((promptMatch || messagePostMatch)[1]);
+      let s = sessions.get(sid);
+      if (!s) {
+        s = { id: sid, title: "huayra", messages: [] };
+        sessions.set(sid, s);
+      }
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+      });
+      req.on("end", () => {
+        let userText = "";
+        try {
+          const parsed = JSON.parse(body || "{}");
+          if (Array.isArray(parsed?.parts)) {
+            userText = parsed.parts.map((p) => p?.text || "").filter(Boolean).join("\n");
+          } else if (typeof parsed?.content === "string") {
+            userText = parsed.content;
+          } else if (typeof parsed?.text === "string") {
+            userText = parsed.text;
+          }
+          if (parsed.agent) current.agent = String(parsed.agent);
+          if (parsed.model) current.model = String(parsed.model);
+          if (parsed.thinking) current.thinking = String(parsed.thinking);
+        } catch {}
+        userText = String(userText || "").trim() || "(empty)";
+        const snippet = userText.slice(0, 200);
+        const reply = `mock reply [${current.agent}/${current.model}]: ${snippet}`;
+        const reasonText =
+          current.thinking && current.thinking !== "idle"
+            ? "thinking " + current.thinking + " on " + snippet.slice(0, 48)
+            : "";
+        s.messages.push({
+          info: { role: "user", id: "msg_u_" + sid.slice(-8) },
+          role: "user",
+          parts: [{ type: "text", text: userText }],
+        });
+        const assistantParts = [];
+        if (reasonText) assistantParts.push({ type: "reasoning", text: reasonText });
+        assistantParts.push({ type: "text", text: reply });
+        s.messages.push({
+          info: { role: "assistant", id: "msg_a_" + sid.slice(-8) },
+          role: "assistant",
+          parts: assistantParts,
+        });
+        s.aborted = false;
+
+        res.writeHead(200, {
+          "content-type": "text/event-stream; charset=utf-8",
+          "access-control-allow-origin": "*",
+          "cache-control": "no-cache",
+          connection: "keep-alive",
+        });
+        const tokens = ["mock reply: ", ...snippet.split(/(\s+)/).filter((t) => t.length > 0)];
+        const partId = "prt_" + sid.slice(-8);
+        if (current.thinking && current.thinking !== "idle") {
+          const reason = {
+            type: "message.part.updated",
+            part: {
+              id: "thk_" + sid.slice(-8),
+              type: "reasoning",
+              text: "thinking " + current.thinking + " on " + snippet.slice(0, 48),
+            },
+          };
+          res.write(`data: ${JSON.stringify(reason)}\n\n`);
+        }
+        for (const token of tokens) {
+          if (s.aborted) break;
+          const evt = {
+            type: "message.part.updated",
+            part: { id: partId, type: "text", text: token },
+            text: token,
+          };
+          res.write(`data: ${JSON.stringify(evt)}\n\n`);
+        }
+        if (s.aborted) {
+          res.write(`data: ${JSON.stringify({ type: "session.idle", aborted: true })}\n\n`);
+        }
+        res.write("data: [DONE]\n\n");
+        res.end();
+      });
+      return true;
+    }
+
+    const abortMatch = path.match(/^\/session\/([^/]+)\/abort$/);
+    if (abortMatch && method === "POST") {
+      const sid = decodeURIComponent(abortMatch[1]);
+      const s = sessions.get(sid);
+      if (s) s.aborted = true;
+      json(res, 200, { ok: true, id: sid });
+      return true;
+    }
+
+    const sessionOne = path.match(/^\/session\/([^/]+)$/);
+    if (sessionOne && method === "GET") {
+      const sid = decodeURIComponent(sessionOne[1]);
+      const s = sessions.get(sid);
+      if (!s) {
+        json(res, 404, { error: "session not found" });
+        return true;
+      }
+      json(res, 200, { id: s.id, title: s.title });
+      return true;
+    }
+    if (sessionOne && method === "PATCH") {
+      const sid = decodeURIComponent(sessionOne[1]);
+      const s = sessions.get(sid);
+      if (!s) {
+        json(res, 404, { error: "session not found" });
+        return true;
+      }
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+      });
+      req.on("end", () => {
+        try {
+          const parsed = JSON.parse(body || "{}");
+          if (parsed?.title) s.title = String(parsed.title);
+        } catch {}
+        json(res, 200, { id: s.id, title: s.title });
+      });
+      return true;
+    }
+    if (sessionOne && method === "DELETE") {
+      const sid = decodeURIComponent(sessionOne[1]);
+      const existed = sessions.delete(sid);
+      json(res, existed ? 200 : 404, existed ? { ok: true, id: sid } : { error: "session not found" });
+      return true;
+    }
+
+    return false;
+  }
+
+  return { handle, sessions, current, agents, models };
+}
+
+/** Mount path prefix used by preview (no trailing slash). */
+export const OPENCODE_MOCK_PREFIX = "/__opencode";
