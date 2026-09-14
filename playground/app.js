@@ -363,6 +363,26 @@
   function shouldAutoTitle(title) {
     return !title || /^session\s+\d+$/i.test(String(title).trim());
   }
+  function isPlaceholderSession(sess) {
+    if (!sess) return false;
+    if (sess.remoteId) return false;
+    if (sess.lines && sess.lines.length) return false;
+    return shouldAutoTitle(sess.title);
+  }
+  function prunePlaceholderSessions() {
+    if (state.sessions.length <= 1) return;
+    const kept = state.sessions.filter((sess, i) => {
+      if (!isPlaceholderSession(sess)) return true;
+      const others = state.sessions.some((s, j) => j !== i && s.remoteId);
+      return !others;
+    });
+    if (kept.length && kept.length !== state.sessions.length) {
+      const prev = state.sessions[state.active];
+      state.sessions = kept;
+      const next = prev ? kept.indexOf(prev) : 0;
+      state.active = next >= 0 ? next : 0;
+    }
+  }
   async function autoTitleFromPrompt(text) {
     const sess = activeSession();
     if (!shouldAutoTitle(sess.title)) return;
@@ -523,10 +543,15 @@
       if (!sess) {
         sess = { id: "remote-" + item.id, title: item.title || item.id.slice(0, 8), lines: [], remoteId: item.id };
         state.sessions.push(sess);
+      } else if (item.title && shouldAutoTitle(sess.title)) {
+        sess.title = item.title;
       }
       const msgs = await api.fetchRemoteMessages(state.attachedUrl, item.id, fetchWithTimeout);
       if (msgs.length) sess.lines = msgs;
     }
+    prunePlaceholderSessions();
+    if (state.active >= state.sessions.length) state.active = 0;
+    state.remoteId = state.sessions[state.active] ? state.sessions[state.active].remoteId : null;
     saveSessions();
     renderSessions();
     renderLog();
