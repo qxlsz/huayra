@@ -208,6 +208,17 @@
       setDot("model-dot", "ok");
     }
     applyCatalog(extra || {});
+    if (extra && (extra.directory || extra.path || extra.cwd)) setWorkspace(extra);
+  }
+  function setWorkspace(health) {
+    const dir = health && (health.directory || health.path || health.cwd);
+    const raw = dir ? String(dir) : "";
+    const parts = raw.replace(/[\\/]+$/, "").split(/[\\/]/).filter(Boolean);
+    const short = parts.length ? parts.slice(-2).join("/") : "-";
+    setText("workspace-label", "workspace " + short);
+    setDot("workspace-dot", raw ? "ok" : "");
+    const el = document.getElementById("workspace-label");
+    if (el) el.title = raw || "workspace from OpenCode health";
   }
   function fetchWithTimeout(url, opts, ms) {
     const ctrl = new AbortController();
@@ -327,14 +338,20 @@
       if (!health) continue;
       const extra = await readAgent(url);
       const kind = url.includes("/__opencode") ? "mock" : "live";
-      setAttach(kind, url, extra);
+      setWorkspace(health);
+      setAttach(kind, url, Object.assign({}, extra, {
+        directory: extra.directory || health.directory || health.path || health.cwd,
+      }));
       appendLine("sys", "attached " + kind + " " + url, false);
       syncRemoteSessions().catch(() => {});
       if (kind === "mock") {
         const liveDirect = await healthAt(DEFAULT_OPENCODE);
         if (liveDirect) {
           const liveExtra = await readAgent(DEFAULT_OPENCODE);
-          setAttach("live", DEFAULT_OPENCODE, liveExtra);
+          setWorkspace(liveDirect);
+          setAttach("live", DEFAULT_OPENCODE, Object.assign({}, liveExtra, {
+            directory: liveExtra.directory || liveDirect.directory || liveDirect.path || liveDirect.cwd,
+          }));
           appendLine("sys", "hopped to live OpenCode " + DEFAULT_OPENCODE, false);
           syncRemoteSessions().catch(() => {});
           return DEFAULT_OPENCODE;
@@ -342,7 +359,10 @@
         const liveProxy = await healthAt(LIVE_PROXY);
         if (liveProxy) {
           const liveExtra = await readAgent(LIVE_PROXY);
-          setAttach("live", LIVE_PROXY, liveExtra);
+          setWorkspace(liveProxy);
+          setAttach("live", LIVE_PROXY, Object.assign({}, liveExtra, {
+            directory: liveExtra.directory || liveProxy.directory || liveProxy.path || liveProxy.cwd,
+          }));
           appendLine("sys", "hopped to live OpenCode via preview proxy", false);
           syncRemoteSessions().catch(() => {});
           return LIVE_PROXY;
@@ -351,6 +371,7 @@
       return url;
     }
     setAttach("none", null, {});
+    setWorkspace(null);
     appendLine("sys", "OpenCode not reachable (tried " + candidates.join(", ") + ")", false);
     return null;
   }
@@ -794,6 +815,9 @@
     if (ev.key === "n" || ev.key === "N") {
       ev.preventDefault();
       document.getElementById("session-new").click();
+    } else if (ev.key === "w" || ev.key === "W") {
+      ev.preventDefault();
+      closeActiveSession();
     } else if (ev.key === "r" || ev.key === "R") {
       ev.preventDefault();
       document.getElementById("session-sync").click();
