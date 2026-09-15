@@ -50,6 +50,8 @@ test("playground app.js console source is complete", () => {
   assert.ok(raw.length > 2000, "console source must not be truncated");
   assert.match(raw, /OpenCode|opencode/i);
   assert.match(raw, /SESSION_STORE_KEY/);
+  assert.match(raw, /AbortError/);
+  assert.match(raw, /sess.lines.push\(\{ cls: "assistant", text: acc \}\)/);
 });
 
 test("LICENSE keeps upstream MIT credit", () => {
