@@ -28,6 +28,8 @@ test("opencode mock health and agent routes", async () => {
   assert.equal(body.healthy, true);
   assert.equal(body.ok, true);
   assert.match(body.version, /^mock-/);
+  assert.equal(typeof body.directory, "string");
+  assert.ok(body.directory.length > 0);
 
   const chunks2 = [];
   const res2 = {

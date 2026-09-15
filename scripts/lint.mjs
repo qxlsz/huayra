@@ -141,6 +141,18 @@ if (!consoleSrc.includes("function promptHistory") || !consoleSrc.includes("func
   failed += 1;
   process.stderr.write("playground/app.js must walk user-line prompt history with Up/Down\n");
 }
+if (!consoleSrc.includes("function setWorkspace") || !consoleSrc.includes("health.directory")) {
+  failed += 1;
+  process.stderr.write("playground/app.js must paint workspace from OpenCode health directory\n");
+}
+if (!consoleSrc.includes('key === "w"') || !consoleSrc.includes("closeActiveSession")) {
+  failed += 1;
+  process.stderr.write("playground/app.js must close the active session on Ctrl+W\n");
+}
+if (!mockSrc.includes("directory: process.cwd()")) {
+  failed += 1;
+  process.stderr.write("src/opencode-mock.js health must include directory for the workspace pill\n");
+}
 if (!mockSrc.includes("thinking: current.thinking")) {
   failed += 1;
   process.stderr.write("src/opencode-mock.js GET /agent must return thinking\n");
