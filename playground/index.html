@@ -304,6 +304,7 @@
         </select>
       </span>
       <span class="pill"><span id="gate-dot" class="dot"></span><span id="gate-label">gate off</span></span>
+      <span class="pill" title="workspace from OpenCode health"><span id="workspace-dot" class="dot"></span><span id="workspace-label">workspace -</span></span>
       <span class="pill"><span id="session-dot" class="dot ok"></span><span id="session-label">session 1</span></span>
     </div>
     <div id="session-bar" aria-label="Session index">
@@ -317,7 +318,7 @@
     <div id="log" role="log" aria-live="polite"></div>
     <footer>
       <form id="prompt-form">
-        <textarea id="prompt" rows="2" placeholder="prompt · Enter send · Shift+Enter newline · Up/Down history · Ctrl+N session · Ctrl+R sync · Ctrl+L focus" autocomplete="off" spellcheck="false"></textarea>
+        <textarea id="prompt" rows="2" placeholder="prompt · Enter send · Shift+Enter newline · Up/Down history · Ctrl+N session · Ctrl+W close · Ctrl+R sync · Ctrl+L focus" autocomplete="off" spellcheck="false"></textarea>
         <button type="submit" id="send">send</button>
         <button type="button" id="stop" title="abort in-flight OpenCode request (Esc)">stop</button>
       </form>
