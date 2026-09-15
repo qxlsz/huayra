@@ -68,6 +68,10 @@ if (!consoleSrc.includes("function abortRemote") || !consoleSrc.includes("/abort
   failed += 1;
   process.stderr.write("playground/app.js missing OpenCode session abort\n");
 }
+if (!consoleSrc.includes('sess.lines.push({ cls: "assistant", text: acc })') || !consoleSrc.includes("AbortError")) {
+  failed += 1;
+  process.stderr.write("playground/app.js must keep streamed tokens on stop\n");
+}
 if (!consoleSrc.includes("function closeActiveSession") || !consoleSrc.includes("deleteRemoteSession")) {
   failed += 1;
   process.stderr.write("playground/app.js missing session index close\n");
