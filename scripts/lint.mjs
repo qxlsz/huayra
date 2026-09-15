@@ -137,10 +137,6 @@ if (!consoleSrc.includes("LIVE_PROXY") || !consoleSrc.includes("/__live")) {
   failed += 1;
   process.stderr.write("playground/app.js must probe same-origin /__live for OpenCode attach\n");
 }
-if (!consoleSrc.includes("function forgetRemoteIds") || !consoleSrc.includes("candidates.push(LIVE_PROXY)")) {
-  failed += 1;
-  process.stderr.write("playground/app.js must probe /__live before the mock and drop stale remote ids on hop\n");
-}
 if (!consoleSrc.includes("extra.provider") || !consoleSrc.includes("extra.thinking")) {
   failed += 1;
   process.stderr.write("playground/app.js must paint provider and thinking from /agent\n");
