@@ -79,7 +79,12 @@ export function createOpenCodeMock() {
     }
 
     if ((path === "/global/health" || path === "/health") && method === "GET") {
-      json(res, 200, { healthy: true, ok: true, version: "mock-1.0.0" });
+      json(res, 200, {
+        healthy: true,
+        ok: true,
+        version: "mock-1.0.0",
+        directory: process.cwd(),
+      });
       return true;
     }
 
