@@ -343,6 +343,7 @@
         directory: extra.directory || health.directory || health.path || health.cwd,
       }));
       appendLine("sys", "attached " + kind + " " + url, false);
+      await dropStaleRemoteIds();
       syncRemoteSessions().catch(() => {});
       if (kind === "mock") {
         const liveDirect = await healthAt(DEFAULT_OPENCODE);
@@ -353,6 +354,7 @@
             directory: liveExtra.directory || liveDirect.directory || liveDirect.path || liveDirect.cwd,
           }));
           appendLine("sys", "hopped to live OpenCode " + DEFAULT_OPENCODE, false);
+          await dropStaleRemoteIds();
           syncRemoteSessions().catch(() => {});
           return DEFAULT_OPENCODE;
         }
@@ -364,6 +366,7 @@
             directory: liveExtra.directory || liveProxy.directory || liveProxy.path || liveProxy.cwd,
           }));
           appendLine("sys", "hopped to live OpenCode via preview proxy", false);
+          await dropStaleRemoteIds();
           syncRemoteSessions().catch(() => {});
           return LIVE_PROXY;
         }
@@ -420,13 +423,48 @@
       await api.renameRemoteSession(state.attachedUrl, sess.remoteId, sess.title, fetchWithTimeout);
     }
   }
+  async function dropStaleRemoteIds() {
+    const api = window.HuayraSessionSync;
+    if (!api || !state.attachedUrl) return 0;
+    const remote = await api.listRemoteSessions(state.attachedUrl, fetchWithTimeout);
+    if (!remote) return 0;
+    const ids = new Set(remote.map((item) => item.id));
+    let dropped = 0;
+    for (const sess of state.sessions) {
+      if (sess.remoteId && !ids.has(sess.remoteId)) {
+        sess.remoteId = null;
+        dropped += 1;
+      }
+    }
+    const active = activeSession();
+    state.remoteId = active ? active.remoteId : null;
+    if (dropped) {
+      saveSessions();
+      renderSessions();
+      appendLine("sys", "dropped " + dropped + " stale remote id(s)", false);
+    }
+    return dropped;
+  }
   async function ensureRemoteSession() {
     const base = state.attachedUrl;
     if (!base) return null;
     const sess = activeSession();
     if (sess.remoteId) {
-      state.remoteId = sess.remoteId;
-      return sess.remoteId;
+      try {
+        const res = await fetchWithTimeout(
+          base + "/session/" + encodeURIComponent(sess.remoteId),
+          { method: "GET", mode: "cors" },
+          1500,
+        );
+        if (res && res.ok) {
+          state.remoteId = sess.remoteId;
+          return sess.remoteId;
+        }
+      } catch {}
+      sess.remoteId = null;
+      state.remoteId = null;
+      saveSessions();
+      renderSessions();
     }
     try {
       const res = await fetchWithTimeout(base + "/session", {

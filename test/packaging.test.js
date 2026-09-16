@@ -52,6 +52,7 @@ test("playground app.js console source is complete", () => {
   assert.match(raw, /SESSION_STORE_KEY/);
   assert.match(raw, /AbortError/);
   assert.match(raw, /sess.lines.push\(\{ cls: "assistant", text: acc \}\)/);
+  assert.match(raw, /dropStaleRemoteIds/);
 });
 
 test("LICENSE keeps upstream MIT credit", () => {
