@@ -14,7 +14,7 @@ Build installers with electron-builder on a machine that has platform toolchains
 
 - macOS: `.dmg` / `.app`
 - Ubuntu: `.AppImage` / `.deb`
-- Windows: `.exe` nsis
+- Windows: `.exe` (NSIS)
 
 Upstream zanneth still ships the CEF + Docker AppImage path for native Linux.
 
