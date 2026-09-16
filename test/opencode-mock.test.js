@@ -58,8 +58,7 @@ test("opencode mock health and agent routes", async () => {
   assert.equal(mock.handle({ method: "GET", on() {} }, res3, "/session"), true);
   const list = JSON.parse(chunks3.join(""));
   assert.equal(Array.isArray(list), true);
-  assert.equal(list[0].id, "sess_index_seed");
-  assert.equal(list[0].title, "index seed");
+  assert.equal(list.length, 0);
 
   const chunks4 = [];
   const res4 = {
@@ -70,7 +69,7 @@ test("opencode mock health and agent routes", async () => {
       chunks4.push(body);
     },
   };
-  assert.equal(mock.handle({ method: "POST", on() {} }, res4, "/session/sess_index_seed/abort"), true);
+  assert.equal(mock.handle({ method: "POST", on() {} }, res4, "/session/sess_missing/abort"), true);
   assert.equal(res4.status, 200);
   assert.equal(JSON.parse(chunks4.join("")).ok, true);
 });

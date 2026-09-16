@@ -33,26 +33,6 @@ function id() {
 export function createOpenCodeMock() {
   /** @type {Map<string, { id: string, title: string, messages: Array<{role:string,text:string}> }>} */
   const sessions = new Map();
-  const seedId = "sess_index_seed";
-  sessions.set(seedId, {
-    id: seedId,
-    title: "index seed",
-    messages: [
-      {
-        info: { role: "user", id: "msg_seed_u" },
-        role: "user",
-        parts: [{ type: "text", text: "list sessions" }],
-      },
-      {
-        info: { role: "assistant", id: "msg_seed_a" },
-        role: "assistant",
-        parts: [
-          { type: "reasoning", text: "pick the live session list" },
-          { type: "text", text: "session index is live" },
-        ],
-      },
-    ],
-  });
 
   const agents = [
     { id: "build", name: "build", model: "mock-model" },
