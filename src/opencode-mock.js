@@ -197,11 +197,11 @@ export function createOpenCodeMock() {
           if (parsed.thinking) current.thinking = String(parsed.thinking);
         } catch {}
         userText = String(userText || "").trim() || "(empty)";
-        const snippet = userText.slice(0, 200);
-        const reply = `[${current.agent}/${current.model}] ${snippet}`;
+        const first = userText.split(/\s+/)[0] || "prompt";
+        const reply = "ack " + first;
         const reasonText =
           current.thinking && current.thinking !== "idle"
-            ? "thinking " + current.thinking + " on " + snippet.slice(0, 48)
+            ? "thinking " + current.thinking + " on " + first
             : "";
         s.messages.push({
           info: { role: "user", id: "msg_u_" + sid.slice(-8) },
@@ -224,7 +224,7 @@ export function createOpenCodeMock() {
           "cache-control": "no-cache",
           connection: "keep-alive",
         });
-        const tokens = snippet.split(/(\s+)/).filter((t) => t.length > 0);
+        const tokens = reply.split(/(\s+)/).filter((t) => t.length > 0);
         const partId = "prt_" + sid.slice(-8);
         if (current.thinking && current.thinking !== "idle") {
           const reason = {
@@ -232,7 +232,7 @@ export function createOpenCodeMock() {
             part: {
               id: "thk_" + sid.slice(-8),
               type: "reasoning",
-              text: "thinking " + current.thinking + " on " + snippet.slice(0, 48),
+              text: reasonText,
             },
           };
           res.write(`data: ${JSON.stringify(reason)}\n\n`);

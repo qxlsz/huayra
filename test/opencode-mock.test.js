@@ -174,7 +174,8 @@ test("preview mounts OpenCode mock under /__opencode", async (t) => {
       }
     })
     .join("");
-  assert.match(joined, /hello mock/);
+  assert.match(joined, /ack hello/);
+  assert.equal(joined.includes("[build/mock-model]"), false);
   assert.ok((streamText.match(/^data:/gm) || []).length >= 3, "expected multi-chunk SSE");
 
   const setThink = await fetch(`http://127.0.0.1:${port}${OPENCODE_MOCK_PREFIX}/agent`, {
